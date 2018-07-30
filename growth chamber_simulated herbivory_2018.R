@@ -47,6 +47,9 @@ growth <- read.csv('Inside_datafinal.csv')%>%
   left_join(trt)
 nodules <- read.csv('Inside_nodule number.csv')%>%
   left_join(trt)
+biomass <- read.csv('Inside_biomass.csv')%>%
+  left_join(trt)%>%
+  mutate(total_biomass=shoot+root)
 
 ###repeated measures ANOVA for height
 summary(heightRManova <- lmer(height ~ diversity_treatment*herbivory*date + (1+pot|date), data=subset(growth, diversity_treatment!=0)))
@@ -70,7 +73,7 @@ ggplot(data=barGraphStats(data=subset(growth, date=='7/23/18' & diversity_treatm
   scale_fill_manual(values=c('dark orange', 'dark green', 'dark blue'))
 
 
-###repeated measures ANOVA for nodule number
+###ANOVA for nodule number
 summary(nodulesGLM <- aov(nodules ~ diversity_treatment*herbivory, data=subset(nodules, diversity_treatment!=0)))
 
 ggplot(data=barGraphStats(data=subset(nodules, diversity_treatment!=0), variable="nodules", byFactorNames=c("diversity_treatment", "herbivory")), aes(x=as.factor(diversity_treatment), y=mean, fill=herbivory)) +
@@ -81,7 +84,34 @@ ggplot(data=barGraphStats(data=subset(nodules, diversity_treatment!=0), variable
   scale_fill_manual(values=c('dark orange', 'dark green', 'dark blue'))
 
 
+###ANOVA for biomass
+summary(shootGLM <- aov(shoot ~ diversity_treatment*herbivory, data=subset(biomass, diversity_treatment!=0)))
 
+ggplot(data=barGraphStats(data=subset(biomass, diversity_treatment!=0), variable="shoot", byFactorNames=c("diversity_treatment", "herbivory")), aes(x=as.factor(diversity_treatment), y=mean, fill=herbivory)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Rhizobial Strain Number') +
+  ylab('Shoot Biomass (g)') +
+  scale_fill_manual(values=c('dark orange', 'dark green', 'dark blue'))
+
+
+summary(rootGLM <- aov(root ~ diversity_treatment*herbivory, data=subset(biomass, diversity_treatment!=0)))
+
+ggplot(data=barGraphStats(data=subset(biomass, diversity_treatment!=0), variable="root", byFactorNames=c("diversity_treatment", "herbivory")), aes(x=as.factor(diversity_treatment), y=mean, fill=herbivory)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Rhizobial Strain Number') +
+  ylab('Root Biomass (g)') +
+  scale_fill_manual(values=c('dark orange', 'dark green', 'dark blue'))
+
+summary(totbioGLM <- aov(total_biomass ~ diversity_treatment*herbivory, data=subset(biomass, diversity_treatment!=0)))
+
+ggplot(data=barGraphStats(data=subset(biomass, diversity_treatment!=0), variable="total_biomass", byFactorNames=c("diversity_treatment", "herbivory")), aes(x=as.factor(diversity_treatment), y=mean, fill=herbivory)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Rhizobial Strain Number') +
+  ylab('Total Biomass (g)') +
+  scale_fill_manual(values=c('dark orange', 'dark green', 'dark blue'))
 
 
 ###monocultures only
