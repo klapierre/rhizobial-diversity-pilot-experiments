@@ -2,7 +2,11 @@ library(tidyverse)
 library(lme4)
 library(lmerTest)
 
+#laptop
 setwd('C:\\Users\\lapie\\Dropbox (Smithsonian)\\SERC\\interns\\2018\\2018_REU_Esch')
+
+#desktop
+setwd('C:\\Users\\la pierrek\\Dropbox (Smithsonian)\\SERC\\interns\\2018\\2018_REU_Esch')
 
 theme_set(theme_bw())
 theme_update(axis.title.x=element_text(size=20, vjust=-0.35), axis.text.x=element_text(size=16),
@@ -43,7 +47,8 @@ pots <- read.csv('Outside_datafinal.csv')%>%
 trt <- read.csv('Outside_treatments.csv')%>%
   mutate(pot=plant..)%>%
   select(-plant..)%>%
-  left_join(pots)
+  left_join(pots)%>%
+  left_join(read.csv('garden_warming treatments.csv'))
 growth <- read.csv('Outside_datafinal.csv')%>%
   filter(height!='NA')%>%
   mutate(bed=bed.., pot=plant.., height=height, leaf_num=X..leaves, herbivorized_leaves=X..leaves.herb., percent_herbivory=avg..herb...leaf)%>%
@@ -53,30 +58,36 @@ growth <- read.csv('Outside_datafinal.csv')%>%
   filter(date=='7/27/2018', height!=999, leaf_num!=999, herbivorized_leaves!=999, percent_herbivory!=999)
 
 
-###repeated measures ANOVA for height
-summary(heightANOVA <- aov(height ~ treatment, data=growth))
+###ANOVA for height
+summary(heightANOVA <- aov(height ~ treatment*warming, data=growth))
 
-ggplot(data=barGraphStats(data=growth, variable="height", byFactorNames=c("treatment")), aes(x=as.factor(treatment), y=mean)) +
+ggplot(data=barGraphStats(data=growth, variable="height", byFactorNames=c("treatment", "warming")), aes(x=as.factor(treatment), y=mean, fill=as.factor(warming))) +
   geom_bar(stat='identity', position=position_dodge()) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
   xlab('Treatment') +
   ylab('Height (cm)')
 
+ggplot(data=barGraphStats(data=growth, variable="height", byFactorNames=c("warming")), aes(x=as.factor(warming), y=mean)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Warming Treatment') +
+  ylab('Height (cm)')
 
-###repeated measures ANOVA for leaf number
-summary(leavesANOVA <- aov(leaf_num ~ treatment, data=growth))
 
-ggplot(data=barGraphStats(data=growth, variable="leaf_num", byFactorNames=c("treatment")), aes(x=as.factor(treatment), y=mean)) +
+###ANOVA for leaf number
+summary(leavesANOVA <- aov(leaf_num ~ treatment*warming, data=growth))
+
+ggplot(data=barGraphStats(data=growth, variable="leaf_num", byFactorNames=c("treatment", "warming")), aes(x=as.factor(treatment), y=mean, fill=as.factor(warming))) +
   geom_bar(stat='identity', position=position_dodge()) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
   xlab('Treatment') +
   ylab('Leaf Number')
 
 
-###repeated measures ANOVA for percent insect herbivory
-summary(herbivoryANOVA <- aov(percent_herbivory ~ treatment, data=growth))
+###ANOVA for percent insect herbivory
+summary(herbivoryANOVA <- aov(percent_herbivory ~ treatment*warming, data=growth))
 
-ggplot(data=barGraphStats(data=growth, variable="percent_herbivory", byFactorNames=c("treatment")), aes(x=as.factor(treatment), y=mean)) +
+ggplot(data=barGraphStats(data=growth, variable="percent_herbivory", byFactorNames=c("treatment", "warming")), aes(x=as.factor(treatment), y=mean, fill=as.factor(warming))) +
   geom_bar(stat='identity', position=position_dodge()) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
   xlab('Treatment') +
