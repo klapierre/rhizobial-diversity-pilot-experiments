@@ -59,36 +59,88 @@ growth <- read.csv('Outside_datafinal.csv')%>%
 
 
 ###ANOVA for height
-summary(heightANOVA <- aov(height ~ treatment*warming, data=growth))
+summary(heightANOVA <- aov(height ~ diversity*warming, data=growth))
+summary(heightANOVA <- aov(height ~ diversity, data=subset(growth, warming==0))) #only among unwarmed
+summary(heightANOVA <- aov(height ~ diversity, data=subset(growth, warming==1))) #only among unwarmed
 
-ggplot(data=barGraphStats(data=growth, variable="height", byFactorNames=c("treatment", "warming")), aes(x=as.factor(treatment), y=mean, fill=as.factor(warming))) +
+#drought*diversity interaction
+ggplot(data=barGraphStats(data=growth, variable="height", byFactorNames=c("diversity", "warming")), aes(x=as.factor(diversity), y=mean, fill=as.factor(warming))) +
   geom_bar(stat='identity', position=position_dodge()) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
   xlab('Treatment') +
   ylab('Height (cm)')
 
-ggplot(data=barGraphStats(data=growth, variable="height", byFactorNames=c("warming")), aes(x=as.factor(warming), y=mean)) +
+#drought only
+heightDroughtPlot <- ggplot(data=barGraphStats(data=growth, variable="height", byFactorNames=c("warming")), aes(x=as.factor(warming), y=mean, fill=as.factor(warming))) +
   geom_bar(stat='identity', position=position_dodge()) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
   xlab('Warming Treatment') +
-  ylab('Height (cm)')
+  ylab('Height (cm)') +
+  scale_fill_manual(values=c("blue", 'orange')) +
+  theme(legend.position='none')
+
+#diversity only -- unwarmed plots
+heightDriversityUnwarmedPlot <- ggplot(data=barGraphStats(data=subset(growth, warming==0), variable="height", byFactorNames=c("diversity")), aes(x=as.factor(diversity), y=mean, fill=diversity)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Rhizobial Diversity Treatment') +
+  ylab('Height (cm)') +
+  theme(legend.position='none')
+
+#diversity only -- warmed plots
+heightDriversityWarmedPlot <- ggplot(data=barGraphStats(data=subset(growth, warming==1), variable="height", byFactorNames=c("diversity")), aes(x=as.factor(diversity), y=mean, fill=diversity)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Rhizobial Diversity Treatment') +
+  ylab('Height (cm)') +
+  scale_fill_gradient(low="orange", high="red") +
+  theme(legend.position='none')
+
 
 
 ###ANOVA for leaf number
-summary(leavesANOVA <- aov(leaf_num ~ treatment*warming, data=growth))
+summary(leavesANOVA <- aov(leaf_num ~ diversity*warming, data=growth))
 
-ggplot(data=barGraphStats(data=growth, variable="leaf_num", byFactorNames=c("treatment", "warming")), aes(x=as.factor(treatment), y=mean, fill=as.factor(warming))) +
+ggplot(data=barGraphStats(data=growth, variable="leaf_num", byFactorNames=c("diversity", "warming")), aes(x=as.factor(diversity), y=mean, fill=as.factor(warming))) +
   geom_bar(stat='identity', position=position_dodge()) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
-  xlab('Treatment') +
+  xlab('Rhizobial Diversity Treatment') +
   ylab('Leaf Number')
 
 
 ###ANOVA for percent insect herbivory
-summary(herbivoryANOVA <- aov(percent_herbivory ~ treatment*warming, data=growth))
+summary(herbivoryANOVA <- aov(percent_herbivory ~ diversity*warming, data=growth))
+summary(herbivoryANOVA <- aov(percent_herbivory ~ diversity, data=subset(growth, warming==0))) #only among unwarmed
+summary(herbivoryANOVA <- aov(percent_herbivory ~ diversity, data=subset(growth, warming==1))) #only among unwarmed
 
-ggplot(data=barGraphStats(data=growth, variable="percent_herbivory", byFactorNames=c("treatment", "warming")), aes(x=as.factor(treatment), y=mean, fill=as.factor(warming))) +
+ggplot(data=barGraphStats(data=growth, variable="percent_herbivory", byFactorNames=c("diversity", "warming")), aes(x=as.factor(diversity), y=mean, fill=as.factor(warming))) +
   geom_bar(stat='identity', position=position_dodge()) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
-  xlab('Treatment') +
+  xlab('Rhizobial Diversity Treatment') +
   ylab('Percent Insect Herbivory')
+
+#drought only
+herbivoryDroughtPlot <- ggplot(data=barGraphStats(data=growth, variable="percent_herbivory", byFactorNames=c("warming")), aes(x=as.factor(warming), y=mean, fill=as.factor(warming))) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Warming Treatment') +
+  ylab('Insect Herbivory (%)') +
+  scale_fill_manual(values=c("blue", 'orange')) +
+  theme(legend.position='none')
+
+#diversity only -- unwarmed plots
+herbivoryDriversityUnwarmedPlot <- ggplot(data=barGraphStats(data=subset(growth, warming==0), variable="percent_herbivory", byFactorNames=c("diversity")), aes(x=as.factor(diversity), y=mean, fill=diversity)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Rhizobial Diversity Treatment') +
+  ylab('Insect Herbivory (%)') +
+  theme(legend.position='none')
+
+#diversity only -- warmed plots
+herbivoryDriversityWarmedPlot <- ggplot(data=barGraphStats(data=subset(growth, warming==1), variable="percent_herbivory", byFactorNames=c("diversity")), aes(x=as.factor(diversity), y=mean, fill=diversity)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Rhizobial Diversity Treatment') +
+  ylab('Insect Herbivory (%)') +
+  scale_fill_gradient(low="orange", high="red") +
+  theme(legend.position='none')
