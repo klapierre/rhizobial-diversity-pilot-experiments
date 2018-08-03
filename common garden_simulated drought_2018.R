@@ -1,6 +1,7 @@
 library(tidyverse)
 library(lme4)
 library(lmerTest)
+library(grid)
 
 #laptop
 setwd('C:\\Users\\lapie\\Dropbox (Smithsonian)\\SERC\\interns\\2018\\2018_REU_Esch')
@@ -160,9 +161,11 @@ herbivoryDriversityWarmedPlot <- ggplot(data=barGraphStats(data=finalDate, varia
 herbivoryDriversityUnwarmedPlot <- ggplot(data=barGraphStats(data=subset(finalDate, warming==0), variable="percent_herbivory", byFactorNames=c("diversity")), aes(x=as.factor(diversity), y=mean, fill=diversity)) +
   geom_bar(stat='identity', position=position_dodge()) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
-  xlab('Rhizobial Diversity Treatment') +
+  xlab('') +
   ylab('Insect Herbivory (%)') +
-  theme(legend.position='none')
+  theme(legend.position='none') +
+  annotate('text', x=0.7, y=7, label='(a)', size=8) +
+  theme(axis.title.x=element_text(size=30, vjust=-0.35), axis.text.x=element_text(size=20), axis.title.y=element_text(size=30, angle=90, vjust=0.5), axis.text.y=element_text(size=20))
 #export at 800x800
 
 #diversity only -- warmed plots
@@ -172,8 +175,15 @@ herbivoryDriversityWarmedPlot <- ggplot(data=barGraphStats(data=subset(finalDate
   xlab('Rhizobial Diversity Treatment') +
   ylab('Insect Herbivory (%)') +
   scale_fill_gradient(low="orange", high="red") +
-  theme(legend.position='none')
+  theme(legend.position='none') +
+  annotate('text', x=0.7, y=8, label='(b)', size=8) +
+  theme(axis.title.x=element_text(size=30, vjust=-0.35), axis.text.x=element_text(size=20), axis.title.y=element_text(size=30, angle=90, vjust=0.5), axis.text.y=element_text(size=20))
 #export at 800x800
+
+pushViewport(viewport(layout=grid.layout(2,1)))
+print(herbivoryDriversityUnwarmedPlot, vp=viewport(layout.pos.row=1, layout.pos.col=1))
+print(herbivoryDriversityWarmedPlot, vp=viewport(layout.pos.row=2, layout.pos.col=1))
+#export at 800x1600
 
 
 ###recovery from rabbit
