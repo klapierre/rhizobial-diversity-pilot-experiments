@@ -32,13 +32,7 @@ library(lme4)
 Growth<- read_csv("Data/Height_Herbivory_Measurements/Garden_Height_Leaves_Herbivory_Data_2018.csv", 
                   #might need to adjust date format (Y or y, depending on whether year is read in as 4 numbers (Y) or 2 (y))
                   col_types = cols(bed_num = col_factor(levels = c("1","2", "3", "4", "5", "6", "7", "8","9", "10", "11", "12", "13", "14", "15", "16")), date = col_date(format = "%m/%d/%Y"), warming = col_factor(levels = c("0","1"))))
-<<<<<<< HEAD
 
-
-=======
-
-
->>>>>>> 1e01d816ef765853eb38f9d12d49373c20d561ca
 #Read in csv into new data frame, changing date to proper format, and bed number and warming to factors
 Herbivory <- read_csv("Data/Height_Herbivory_Measurements/Warming_Garden_Percent_Herbivory_2018.csv", 
                       col_types = cols(bed_num = col_factor(levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16")), date = col_date(format = "%m/%d/%Y"), warming = col_factor(levels = c("1", "0")))) #might need to adjust date format (Y or y)
