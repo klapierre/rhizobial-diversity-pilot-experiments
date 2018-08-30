@@ -28,6 +28,9 @@ library(readxl)
 library(summarytools)
 #install.packages("lme4")
 library(lme4)
+#install.packages("lmerTest")
+library(lmerTest)
+
 
 #### Data ####
 #Read in csv into new data frame and change bed_num, and warming to factors, and change date to proper date format 
@@ -45,7 +48,7 @@ Treatment <- read_csv("Data/Height_Herbivory_Measurements/Diversity_Treatment_20
 
 #Read in csv into new data frame, changing bed_num and diversity to factors
 Aphids<-read_csv("Data/Aphids/2018_Insect_Counts.csv", 
-                 col_types = cols(Aphids = col_number(),Large_Ants = col_number(), Predator_Ladybug = col_number(),Predator_Spider = col_number(), Recorder = col_factor(levels = c("KL","KB", "JP", "KB_JP_KL")), Small_Ants = col_number(),bed_num = col_factor(levels = c("1","2", "3", "4", "5", "6", "7","8", "9", "10", "11", "12", "13", "14", "15", "16")), date = col_date(format = "%m/%d/%Y"),warming = col_factor(levels = c("1", "0"))))
+                 col_types = cols(Aphids = col_number(), Large_Ants = col_number(), Predator_Ladybug = col_number(),Predator_Spider = col_number(), Small_Ants = col_number(),bed_num = col_factor(levels = c("1","2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13","14", "15", "16")), date = col_date(format = "%m/%d/%Y"), warming = col_factor(levels = c("1", "0"))))
         
 #### Data wrangling ####
 
@@ -61,40 +64,40 @@ Herbivory_sum<-Herbivory%>%
   summarise(dmg_sum=sum(perc_herbivory), rust_sum=sum(percent_rust))
 
 #Merge Growth data frame and Herbivory_sum data frame by plant_num, date, and bed_num
-merge<-merge(Growth, Herbivory_sum, by=c("plant_num", "date", "bed_num"), all.x=T)
+Merge<-merge(Growth, Herbivory_sum, by=c("plant_num", "date", "bed_num"), all.x=T)
 
 #Make a new data frame called individuals
-individuals<-merge%>%
+Individuals<-Merge%>%
   #replace any 'na' values with zero
   mutate(dmg_sum=replace_na(dmg_sum, 0), rust_sum=replace_na(rust_sum, 0))
   
 ##Joined two above steps into one##
 #Make a new data frame called individuals from Growth data frame.  Left_join data frame Herbivory_sum and replace all "na"s in dmg_sum and rust_sum with 0s
-individuals<-Growth%>%
-  left_join(Herbivory_sum)%>%
-  mutate(dmg_sum=replace_na(dmg_sum, 0), rust_sum=replace_na(rust_sum, 0))
+#Individuals<-Growth%>%
+  #left_join(Herbivory_sum)%>%
+  #mutate(dmg_sum=replace_na(dmg_sum, 0), rust_sum=replace_na(rust_sum, 0))
 
 
 #individuals[individuals==9999]<-NA
 
 #View summary of data frame individuals 
-view(dfSummary(individuals))   
+view(dfSummary(Individuals))   
 
 #adding avg dmg. find a different way to change 9999 to na and combine these three steps.
-individuals2<-individuals%>%
+Individuals2<-Individuals%>%
   mutate(dmg_avg=dmg_sum/num_leaves, rust_avg=rust_sum/num_leaves)%>%
   select(-dmg_sum, -rust_sum)%>%
   left_join(Treatment)
 
 #Averages per bed number and treatment type
-Average_Height_Leaves<-individuals2%>%
+Average_Height_Leaves<-Individuals2%>%
   filter(height_cm!=9999)%>%
   filter(num_leaves!=9999)%>%
   group_by(bed_num,warming,diversity,date)%>%
   summarise(Height_avg=mean(height_cm),num_leaves_avg=mean(num_leaves),num_flowers_avg=mean(num_flowers))
 
 #make new data frame for flower number
-flower_number<-individuals2%>%
+Flower_Number<-Individuals2%>%
   filter(num_leaves!=9999)%>%
   group_by(bed_num,date)%>%
   mutate(num_plants=length(plant_num))%>%
@@ -114,7 +117,7 @@ Aphid_Avg<-Aphids%>%
 
 
 #Make new data frame for error bars
-Growth_data_Summary<-individuals2%>%
+Growth_data_Summary<-Individuals2%>%
   #Group data by the columns "Watershed" and "exclosure"
   group_by(bed_num,warming,diversity)%>%
   #In this data frame, summarize the data.  Make a new column named "Richness_Std" and calculate the standard deviation from the column "Richness".  Also calculate the mean and length from the column "Richness" and place them into their own columns.
@@ -125,7 +128,7 @@ Growth_data_Summary<-individuals2%>%
 #### graphing ####
 
 #Make plot from data frame individuals2 in order to graph the height of each plant by date with warming/not in two different colors
-ggplot(subset(individuals2,height_cm!=9999), aes(date, height_cm, color=(warming)))+#filter out 9999
+ggplot(subset(Individuals2,height_cm!=9999), aes(date, height_cm, color=(warming)))+#filter out 9999
   geom_jitter()+
   #Add smooth line across data
   geom_smooth()
@@ -135,7 +138,7 @@ ggplot(Average_Height_Leaves, aes(as.factor(diversity), Height_avg,fill=warming)
   geom_bar(stat = "identity", position="dodge")
 
 #Make plot from data frame individuals2 in order to graph the number of leaves of each plant by date with warming/not in two different colors
-ggplot(subset(individuals2,num_leaves!=9999), aes(date, num_leaves, color=as.factor(warming)))+
+ggplot(subset(Individuals2,num_leaves!=9999), aes(date, num_leaves, color=as.factor(warming)))+
   geom_jitter()+
   #Add smooth line across data
   geom_smooth()
@@ -146,14 +149,14 @@ ggplot(Average_Height_Leaves, aes(as.factor(diversity), num_leaves_avg,fill=warm
 #geom_errorbar((aes(ymin=num_leaves_Mean-num_leaves_St_Error,ymax=num_leaves_Mean+num_leaves_St_Error),position=position_dodge(0.9),width=0.2))
 
 #Make plot from data frame individuals2 in order to graph the average damage per leaf by date with warming/not in two different colors
-ggplot(subset(individuals2, dmg_avg<=75), aes(date, dmg_avg, color=as.factor(warming)))+ #subsetted outliers ****need to be checked
+ggplot(subset(Individuals2, dmg_avg<=75), aes(date, dmg_avg, color=as.factor(warming)))+ #subsetted outliers ****need to be checked
   geom_jitter()+
   #Add smooth line across data
   geom_smooth()
 
 
 #Make plot from data frame individuals2 in order to graph the number of flowers of each plant by date with warming/not in two different colors
-ggplot(subset(individuals2, num_flowers<=100), aes(x=warming, y=num_flowers))+#subsetted outliers ****need to remove 9999s
+ggplot(subset(Individuals2, num_flowers<=100), aes(x=warming, y=num_flowers))+#subsetted outliers ****need to remove 9999s
   geom_bar(stat = "identity", position="dodge")
 
 #Make a plot from data frame individuals2 in order to graph avg number of flowers per plant by rhizobial diversity treatment
@@ -171,9 +174,13 @@ ggplot(Aphid_Avg, aes(as.factor(diversity), aphid_avg,fill=warming))+
 ########
 
 summary(aov(Aphids~diversity*warming,data = Aphid_Avg))
+lmer(Aphids~diversity*warming+(1|bed_num),data = Aphid_Avg)
 
-lmer(height_cm~diversity*warming+(1|plant_num),data=individuals2)
+summary (Mixed_Model_Aphids <- lmer(Aphids~diversity*warming+(1|bed_num),data = Aphid_Avg))
+anova(Mixed_Model_Aphids)
 
-lmer(num_leaves~diversity*warming+(1|plant_num),data=individuals2)
-lmer(dmg_avg~diversity*warming*date+(1|plant_num),data=subset(individuals2, dmg_avg!="NA"& dmg_avg!="NaN"& dmg_avg!="Inf"))
+
+lmer(height_cm~diversity*warming+(1|plant_num),data=Individuals2)
+lmer(num_leaves~diversity*warming+(1|plant_num),data=Individuals2)
+lmer(dmg_avg~diversity*warming*date+(1|plant_num),data=subset(Individuals2, dmg_avg!="NA"& dmg_avg!="NaN"& dmg_avg!="Inf"))
 
