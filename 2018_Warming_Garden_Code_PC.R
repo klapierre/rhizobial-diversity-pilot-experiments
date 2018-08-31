@@ -40,7 +40,7 @@ Growth<- read_csv("Data/Height_Herbivory_Measurements/Garden_Height_Leaves_Herbi
 
 #Read in csv into new data frame, changing date to proper format, and bed number and warming to factors
 Herbivory <- read_csv("Data/Height_Herbivory_Measurements/Warming_Garden_Percent_Herbivory_2018.csv", 
-                      col_types = cols(bed_num = col_factor(levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16")), date = col_date(format = "%m/%d/%y"), warming = col_factor(levels = c("1", "0")))) #might need to adjust date format (Y or y)
+                      col_types = cols(bed_num = col_factor(levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16")), date = col_date(format = "%m/%d/%Y"), warming = col_factor(levels = c("1", "0")))) #might need to adjust date format (Y or y)
 
 #Read in csv into new data frame, changing bed_num and diversity to factors
 Treatment <- read_csv("Data/Height_Herbivory_Measurements/Diversity_Treatment_2018.csv",
@@ -52,32 +52,24 @@ Aphids<-read_csv("Data/Aphids/2018_Insect_Counts.csv",
         
 #### Data wrangling ####
 
-#In the herbivory data frame, change any 9999 (meaning dead plant) to 0s
-Herbivory[Herbivory==9999]<-0
-
-
 #Make a new data frame called Herbivory_sum
 Herbivory_sum<-Herbivory%>%
+  #Filter out 9999
+  filter(perc_herbivory!=9999)%>%
   #group by date, plant_num, and bed_num
-  group_by(date, plant_num, bed_num)%>%
+  group_by(date, plant_num, bed_num, warming)%>%
   #find the sum of percent herbivory and percent rust by above groupings
   summarise(dmg_sum=sum(perc_herbivory), rust_sum=sum(percent_rust))
 
-#Merge Growth data frame and Herbivory_sum data frame by plant_num, date, and bed_num
-Merge<-merge(Growth, Herbivory_sum, by=c("plant_num", "date", "bed_num"), all.x=T)
+#Make a new data frame called Individuals from Growth data frame.  Left_join data frame Herbivory_sum
+Individuals <-Growth%>%
+  left_join(Herbivory_sum)
 
-#Make a new data frame called individuals
-Individuals<-Merge%>%
-  #replace any 'na' values with zero
-  mutate(dmg_sum=replace_na(dmg_sum, 0), rust_sum=replace_na(rust_sum, 0))
-  
-##Joined two above steps into one##
+##Unnecessary now? Keeping incase we need to go back to it
 #Make a new data frame called individuals from Growth data frame.  Left_join data frame Herbivory_sum and replace all "na"s in dmg_sum and rust_sum with 0s
 #Individuals<-Growth%>%
   #left_join(Herbivory_sum)%>%
   #mutate(dmg_sum=replace_na(dmg_sum, 0), rust_sum=replace_na(rust_sum, 0))
-
-
 #individuals[individuals==9999]<-NA
 
 #View summary of data frame individuals 
@@ -87,7 +79,8 @@ view(dfSummary(Individuals))
 Individuals2<-Individuals%>%
   mutate(dmg_avg=dmg_sum/num_leaves, rust_avg=rust_sum/num_leaves)%>%
   select(-dmg_sum, -rust_sum)%>%
-  left_join(Treatment)
+  left_join(Treatment)%>%
+  select(-treatment_code)
 
 #Averages per bed number and treatment type
 Average_Height_Leaves<-Individuals2%>%
