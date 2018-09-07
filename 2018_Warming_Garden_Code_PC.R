@@ -48,7 +48,8 @@ Treatment <- read_csv("Data/Height_Herbivory_Measurements/Diversity_Treatment_20
 
 #Read in csv into new data frame, changing bed_num and diversity to factors
 Aphids<-read_csv("Data/Aphids/2018_Insect_Counts.csv", 
-                 col_types = cols(Aphids = col_number(), Large_Ants = col_number(), Predator_Ladybug = col_number(),Predator_Spider = col_number(), Small_Ants = col_number(),bed_num = col_factor(levels = c("1","2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13","14", "15", "16")), date = col_date(format = "%m/%d/%Y"), warming = col_factor(levels = c("1", "0"))))
+                 col_types = cols(Aphids = col_number(), Large_Ants = col_number(), Predator_Ladybug = col_number(),Predator_Spider = col_number(), Small_Ants = col_number(),bed_num = col_factor(levels = c("1","2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13","14", "15", "16")), date = col_date(format = "%m/%d/%Y"), warming = col_factor(levels = c("1", "0"))))%>%
+  left_join(Treatment)
         
 #### Data wrangling ####
 
@@ -63,7 +64,9 @@ Herbivory_sum<-Herbivory%>%
 
 #Make a new data frame called Individuals from Growth data frame.  Left_join data frame Herbivory_sum
 Individuals <-Growth%>%
-  left_join(Herbivory_sum)
+  left_join(Herbivory_sum)%>%
+  mutate(dmg_sum=ifelse(num_leaves==9999,9999,dmg_sum))%>%
+  mutate(rust_sum=ifelse(num_leaves==9999,9999,rust_sum))
 
 ##Unnecessary now? Keeping incase we need to go back to it
 #Make a new data frame called individuals from Growth data frame.  Left_join data frame Herbivory_sum and replace all "na"s in dmg_sum and rust_sum with 0s
@@ -101,6 +104,20 @@ Flower_Number<-Individuals2%>%
   ungroup()%>%
   mutate(flower_avg=flower_sum/num_plants)
 
+Pod_Number_Avg<-Individuals2%>%
+  select(bed_num,date,warming,num_pods,diversity,plant_num)%>%
+  filter(num_pods!=9999)%>%
+  group_by(bed_num,date)%>%
+  mutate(num_plants=length(plant_num))%>%
+  ungroup()%>%
+  group_by(bed_num,date,num_plants)%>%
+  summarise(pod_sum=sum(num_pods))%>%
+  ungroup()%>%
+  mutate(Pod_avg=pod_sum/num_plants)
+
+Pod_Number<-Individuals2%>%
+  left_join(Pod_Number_Avg)
+
 #Make a new data frame to join Aphid data with treatment and warming data
 Aphid_Avg<-Aphids%>%
   left_join(Treatment)%>%
@@ -120,60 +137,137 @@ Growth_data_Summary<-Individuals2%>%
 
 #### graphing ####
 
+theme_update(axis.title.x=element_text(size=20, vjust=-0.35, margin=margin(t=15)),
+             axis.text.x=element_text(size=20), axis.title.y=element_text(size=20, angle=90, vjust=0.5,
+                                                                          margin=margin(r=15)), axis.text.y=element_text(size=20), plot.title =
+               element_text(size=20, vjust=2), panel.grid.major= element_line("grey"
+               ),
+             panel.grid.minor=element_blank(), legend.title=element_text(face="bold"),
+             legend.text=element_text(size=30), panel.background=element_rect((fill="white")))
+
 #Make plot from data frame individuals2 in order to graph the height of each plant by date with warming/not in two different colors
 ggplot(subset(Individuals2,height_cm!=9999), aes(date, height_cm, color=(warming)))+#filter out 9999
   geom_jitter()+
   #Add smooth line across data
-  geom_smooth()
+  geom_smooth()+
+  #Label the x-axis "Date"
+  xlab("Date")+
+  #Label the y-axis "Height(cm)"
+  ylab("Height(cm)")
 
 #Make a plot from data frame Average_Height_Leaves in order to graph average height by rhizobial diversity treatment
 ggplot(Average_Height_Leaves, aes(as.factor(diversity), Height_avg,fill=warming))+
-  geom_bar(stat = "identity", position="dodge")
+  geom_bar(stat = "identity", position="dodge")+
+  #Label the x-axis "Rhizobial Diversity"
+  xlab("Rhizobial Diversity")+
+  #Label the y-axis "Height(cm)"
+  ylab("Height(cm)")+
+  expand_limits(y=80)
 
 #Make plot from data frame individuals2 in order to graph the number of leaves of each plant by date with warming/not in two different colors
 ggplot(subset(Individuals2,num_leaves!=9999), aes(date, num_leaves, color=as.factor(warming)))+
   geom_jitter()+
   #Add smooth line across data
-  geom_smooth()
+  geom_smooth()+
+  #Label the x-axis "Date"
+  xlab("Date")+
+  #Label the y-axis "Number of Leaflets"
+  ylab("Number of Leaflets")
+
+#Make plot from data frame individuals2 in order to graph the number of leaves of each plant by date with warming/not in two different colors
+ggplot(subset(Individuals2,num_leaves!=9999), aes(date, num_leaves, color=as.factor(diversity)))+
+  geom_jitter()+
+  #Add smooth line across data
+  geom_smooth(se=F)+
+  #Label the x-axis "Date"
+  xlab("Date")+
+  #Label the y-axis "Number of Leaflets"
+  ylab("Number of Leaflets")+
+  facet_wrap(~warming)
 
 #Make a plot from data frame individuals2 in order to graph avg numberof leaves per plant by rhizobial diversity treatment
 ggplot(Average_Height_Leaves, aes(as.factor(diversity), num_leaves_avg,fill=warming))+
-  geom_bar(stat = "identity", position="dodge")#+
-#geom_errorbar((aes(ymin=num_leaves_Mean-num_leaves_St_Error,ymax=num_leaves_Mean+num_leaves_St_Error),position=position_dodge(0.9),width=0.2))
+  geom_bar(stat = "identity", position="dodge")+
+#geom_errorbar((aes(ymin=num_leaves_Mean-num_leaves_St_Error,ymax=num_leaves_Mean+num_leaves_St_Error),position=position_dodge(0.9),width=0.2))+
+  #Label the x-axis "Rhizobial Diversity"
+xlab("Rhizobial Diversity")+
+  #Label the y-axis "Number of Leaflets"
+  ylab("Numberof Leaflets")+
+  expand_limits(y=120)
 
 #Make plot from data frame individuals2 in order to graph the average damage per leaf by date with warming/not in two different colors
-ggplot(subset(Individuals2, dmg_avg<=75), aes(date, dmg_avg, color=as.factor(warming)))+ #subsetted outliers ****need to be checked
+ggplot(subset(Individuals2, dmg_avg<=75& date!="2018-08-23"), aes(date, dmg_avg, color=as.factor(warming)))+ #subsetted outliers ****need to be checked - % above 100
   geom_jitter()+
   #Add smooth line across data
-  geom_smooth()
+  geom_smooth()+
+  #Label the x-axis "Date"
+  xlab("Date")+
+  #Label the y-axis "Average % Herbivory per Leaf"
+  ylab("Average % Herbivory per Leaf")+
+  expand_limits(y=50)
 
+#Make plot from data frame individuals2 in order to graph the average damage per leaf by date with warming/not in two different colors
+ggplot(subset(Individuals2, dmg_avg<=75& date!="2018-08-23"), aes(date, dmg_avg, color=as.factor(diversity)))+ #subsetted outliers ****need to be checked - % above 100
+  geom_jitter()+
+  #Add smooth line across data
+  geom_smooth(se=F)+
+  #Label the x-axis "Date"
+  xlab("Date")+
+  #Label the y-axis "Average % Herbivory per Leaf"
+  ylab("Average % Herbivory per Leaf")+
+  expand_limits(y=50)+
+  facet_wrap(~warming)
+  
 
 #Make plot from data frame individuals2 in order to graph the number of flowers of each plant by date with warming/not in two different colors
 ggplot(subset(Individuals2, num_flowers<=100), aes(x=warming, y=num_flowers))+#subsetted outliers ****need to remove 9999s
-  geom_bar(stat = "identity", position="dodge")
+  geom_bar(stat = "identity", position="dodge")+
+#Label the x-axis "Date"
+  xlab("Warming")+
+  #Label the y-axis "Average % Herbivory per Leaf"
+  ylab("Number of Flowers")+
+  expand_limits(y=100)
 
 #Make a plot from data frame individuals2 in order to graph avg number of flowers per plant by rhizobial diversity treatment
 ggplot(Average_Height_Leaves, aes(as.factor(diversity), num_flowers_avg,fill=warming))+
-  geom_bar(stat = "identity", position="dodge")
+  geom_bar(stat = "identity", position="dodge")+
+  #Label the x-axis "Rhizobial Diversity"
+  xlab("Rhizobial Diversity")+
+  #Label the y-axis "Average % Herbivory per Leaf"
+  ylab("Number of Flowers")+
+  expand_limits(y=100)
 
 #Make a plot from data frame individuals2 in order to graph avg number of flowers per plant by rhizobial diversity treatment
-ggplot(Average_Height_Leaves, aes(as.factor(diversity), num_leaves_avg,fill=warming))+
-  geom_bar(stat = "identity", position="dodge")
+ggplot(Aphid_Avg, aes(as.factor(diversity), aphid_avg,fill=warming))+##not aphid average
+  geom_boxplot()+
+  #Label the x-axis "Rhizobial Diversity"
+  xlab("Rhizobial Diversity")+
+  #Label the y-axis "Average Number of Aphids"
+  ylab("Average Number of Aphids")
 
 #Make a plot from data frame individuals2 in order to graph avg number of flowers per plant by rhizobial diversity treatment
-ggplot(Aphid_Avg, aes(as.factor(diversity), aphid_avg,fill=warming))+
-  geom_boxplot()
+ggplot(subset(Pod_Number, num_pods!=9999&date=="2018-09-07"), aes(as.factor(diversity),num_pods,fill=warming))+
+  geom_boxplot()+
+  #Label the x-axis "Rhizobial Diversity"
+  xlab("Rhizobial Diversity")+
+  #Label the y-axis "Average Number of Aphids"
+  ylab("Pods")
+
 
 ########
 
-summary(aov(Aphids~diversity*warming,data = Aphid_Avg))
-lmer(Aphids~diversity*warming+(1|bed_num),data = Aphid_Avg)
 
-summary (Mixed_Model_Aphids <- lmer(Aphids~diversity*warming+(1|bed_num),data = Aphid_Avg))
+summary(aov(Aphids~diversity*warming,data = Aphids))
+lmer(Aphids~diversity*warming+(1|bed_num),data = Aphids)
+
+summary (Mixed_Model_Aphids <- lmer(Aphids~diversity*warming+(1|bed_num),data = Aphids))
 anova(Mixed_Model_Aphids)
 
+summary(Mixed_Model_Height<- lmer(height_cm~diversity*warming+(1|plant_num),data=Individuals2))
+anova(Mixed_Model_Height)
 
-lmer(height_cm~diversity*warming+(1|plant_num),data=Individuals2)
-lmer(num_leaves~diversity*warming+(1|plant_num),data=Individuals2)
-lmer(dmg_avg~diversity*warming*date+(1|plant_num),data=subset(Individuals2, dmg_avg!="NA"& dmg_avg!="NaN"& dmg_avg!="Inf"))
+summary(Mixed_Model_Leaves<-lmer(num_leaves~diversity*warming*date+(1|plant_num),data=Individuals2))
+anova(Mixed_Model_Leaves)
 
+summary(Mixed_Model_Dmg<-lmer(dmg_avg~diversity*warming*date+(1|plant_num),data=subset(Individuals2, dmg_avg!="NA"& dmg_avg!="NaN"& dmg_avg!="Inf"& date!="2018-08-23")))
+anova(Mixed_Model_Dmg)
