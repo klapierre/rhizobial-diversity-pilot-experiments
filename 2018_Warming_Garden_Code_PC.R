@@ -34,9 +34,8 @@ library(lmerTest)
 
 #### Data ####
 #Read in csv into new data frame and change bed_num, and warming to factors, and change date to proper date format 
-Growth<- read_csv("Data/Height_Herbivory_Measurements/Garden_Height_Leaves_Herbivory_Data_2018.csv", 
-                  #might need to adjust date format (Y or y, depending on whether year is read in as 4 numbers (Y) or 2 (y))
-                  col_types = cols(bed_num = col_factor(levels = c("1","2", "3", "4", "5", "6", "7", "8","9", "10", "11", "12", "13", "14", "15", "16")), date = col_date(format = "%m/%d/%Y"), warming = col_factor(levels = c("0","1"))))
+Growth<- read_csv("C:/Users/bloodworthk/Dropbox (Smithsonian)/SERC Ecosystem Conservation/Projects/Common_Garden/2018/Data/Height_Herbivory_Measurements/Garden_Height_Leaves_Herbivory_Data_2018.csv",col_types = cols(bed_num = col_factor(levels = c("1", "2", "3", "4", "5", "6", "7", "8","9", "10", "11", "12", "13", "14","15", "16")), date = col_date(format = "%m/%d/%Y"), height_cm = col_number(), num_flowers = col_number(),num_leaves = col_number(), num_pods = col_number(),num_rabbit_herb = col_number(), warming = col_factor(levels = c("0","1")))) #might need to adjust date format (Y or y, depending on whether year is read in as 4 numbers (Y) or 2 (y))
+        
 
 #Read in csv into new data frame, changing date to proper format, and bed number and warming to factors
 Herbivory <- read_csv("Data/Height_Herbivory_Measurements/Warming_Garden_Percent_Herbivory_2018.csv", 
@@ -81,7 +80,7 @@ view(dfSummary(Individuals))
 #adding avg dmg. find a different way to change 9999 to na and combine these three steps.
 Individuals2<-Individuals%>%
   mutate(dmg_avg=dmg_sum/num_leaves, rust_avg=rust_sum/num_leaves)%>%
-  select(-dmg_sum, -rust_sum)%>%
+  select(-dmg_sum, -rust_sum,-Comments)%>%
   left_join(Treatment)%>%
   select(-treatment_code)
 
@@ -152,8 +151,20 @@ ggplot(subset(Individuals2,height_cm!=9999), aes(date, height_cm, color=(warming
   geom_smooth()+
   #Label the x-axis "Date"
   xlab("Date")+
-  #Label the y-axis "Height(cm)"
+  #Label the y-axis "Height (cm)"
   ylab("Height(cm)")
+
+#FACET WRAP Make plot from data frame individuals2 in order to graph the height of each plant by date with warming/not in two different colors
+ggplot(subset(Individuals2,height_cm!=9999), aes(date, height_cm, color=(diversity)))+#filter out 9999
+  geom_jitter()+
+  #Add smooth line across data
+  geom_smooth(se=F)+
+  #Label the x-axis "Date"
+  xlab("Date")+
+  #Label the y-axis "Height (cm)"
+  ylab("Height(cm)")+
+  facet_wrap(~warming)
+
 
 #Make a plot from data frame Average_Height_Leaves in order to graph average height by rhizobial diversity treatment
 ggplot(Average_Height_Leaves, aes(as.factor(diversity), Height_avg,fill=warming))+
@@ -196,7 +207,7 @@ xlab("Rhizobial Diversity")+
   expand_limits(y=120)
 
 #Make plot from data frame individuals2 in order to graph the average damage per leaf by date with warming/not in two different colors
-ggplot(subset(Individuals2, dmg_avg<=75& date!="2018-08-23"), aes(date, dmg_avg, color=as.factor(warming)))+ #subsetted outliers ****need to be checked - % above 100
+ggplot(subset(Individuals2, dmg_avg<=75 & date!="2018-08-23"), aes(date, dmg_avg, color=as.factor(warming)))+ #subsetted outliers ****need to be checked - % above 100
   geom_jitter()+
   #Add smooth line across data
   geom_smooth()+
@@ -228,6 +239,18 @@ ggplot(subset(Individuals2, num_flowers<=100), aes(x=warming, y=num_flowers))+#s
   ylab("Number of Flowers")+
   expand_limits(y=100)
 
+#Number of Leaves by date
+ggplot(subset(Individuals2, num_flowers<=200), aes(date, num_flowers, color=as.factor(diversity)))+ 
+  geom_jitter()+
+  #Add smooth line across data
+  geom_smooth(se=F)+
+  #Label the x-axis "Date"
+  xlab("Date")+
+  #Label the y-axis "Average % Herbivory per Leaf"
+  ylab("Number of Flowers")+
+  expand_limits(y=50)+
+  facet_wrap(~warming)
+
 #Make a plot from data frame individuals2 in order to graph avg number of flowers per plant by rhizobial diversity treatment
 ggplot(Average_Height_Leaves, aes(as.factor(diversity), num_flowers_avg,fill=warming))+
   geom_bar(stat = "identity", position="dodge")+
@@ -246,13 +269,36 @@ ggplot(Aphid_Avg, aes(as.factor(diversity), aphid_avg,fill=warming))+##not aphid
   ylab("Average Number of Aphids")
 
 #Make a plot from data frame individuals2 in order to graph avg number of flowers per plant by rhizobial diversity treatment
-ggplot(subset(Pod_Number, num_pods!=9999&date=="2018-09-07"), aes(as.factor(diversity),num_pods,fill=warming))+
+ggplot(subset(Pod_Number, num_pods!=9999), aes(as.factor(diversity),num_pods,fill=warming))+
   geom_boxplot()+
   #Label the x-axis "Rhizobial Diversity"
   xlab("Rhizobial Diversity")+
   #Label the y-axis "Average Number of Aphids"
-  ylab("Pods")
+  ylab("Pods")+
+  facet_wrap(~date,drop = TRUE)
 
+#Number of Leaves by date
+ggplot(subset(Individuals2, num_pods!=9999), aes(date, num_pods, color=as.factor(diversity)))+ 
+  geom_jitter()+
+  #Add smooth line across data
+  geom_smooth(se=F)+
+  #Label the x-axis "Date"
+  xlab("Date")+
+  #Label the y-axis "Average % Herbivory per Leaf"
+  ylab("Number of Pods")+
+  facet_wrap(~warming)
+
+#Number of Leaves by date
+ggplot(subset(Individuals2, num_pods<=200), aes(date, num_pods, color=as.factor(diversity)))+ 
+  geom_jitter()+
+  #Add smooth line across data
+  geom_smooth(se=F)+
+  #Label the x-axis "Date"
+  xlab("Date")+
+  #Label the y-axis "Average % Herbivory per Leaf"
+  ylab("Number of pods")+
+  expand_limits(y=50)+
+  facet_wrap(~warming, drop = TRUE)
 
 ########
 
@@ -271,3 +317,10 @@ anova(Mixed_Model_Leaves)
 
 summary(Mixed_Model_Dmg<-lmer(dmg_avg~diversity*warming*date+(1|plant_num),data=subset(Individuals2, dmg_avg!="NA"& dmg_avg!="NaN"& dmg_avg!="Inf"& date!="2018-08-23")))
 anova(Mixed_Model_Dmg)
+
+summary (Mixed_Model_Pods_09_07 <- lmer(num_pods~diversity*warming+(1|bed_num),data = subset(Pod_Number, date=="2018-09-07"&num_pods!=9999)))
+anova(Mixed_Model_Pods)
+
+
+summary (Mixed_Model_Pods_09_20 <- lmer(num_pods~diversity*warming+(1|bed_num),data = subset(Pod_Number, date=="2018-09-20"&num_pods!=9999)))
+anova(Mixed_Model_Pods)
