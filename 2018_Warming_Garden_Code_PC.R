@@ -34,19 +34,19 @@ library(lmerTest)
 
 #### Data ####
 #Read in csv into new data frame and change bed_num, and warming to factors, and change date to proper date format 
-Growth<- read_csv("C:/Users/bloodworthk/Dropbox (Smithsonian)/SERC Ecosystem Conservation/Projects/Common_Garden/2018/Data/Height_Herbivory_Measurements/Garden_Height_Leaves_Herbivory_Data_2018.csv",col_types = cols(bed_num = col_factor(levels = c("1", "2", "3", "4", "5", "6", "7", "8","9", "10", "11", "12", "13", "14","15", "16")), date = col_date(format = "%m/%d/%Y"), height_cm = col_number(), num_flowers = col_number(),num_leaves = col_number(), num_pods = col_number(),num_rabbit_herb = col_number(), warming = col_factor(levels = c("0","1")))) #might need to adjust date format (Y or y, depending on whether year is read in as 4 numbers (Y) or 2 (y))
+Growth<- read_csv("Height_Herbivory_Measurements/Garden_Height_Leaves_Herbivory_Data_2018.csv",col_types = cols(bed_num = col_factor(levels = c("1", "2", "3", "4", "5", "6", "7", "8","9", "10", "11", "12", "13", "14","15", "16")), date = col_date(format = "%m/%d/%Y"), height_cm = col_number(), num_flowers = col_number(),num_leaves = col_number(), num_pods = col_number(),num_rabbit_herb = col_number(), warming = col_factor(levels = c("0","1")))) #might need to adjust date format (Y or y, depending on whether year is read in as 4 numbers (Y) or 2 (y))
         
 
 #Read in csv into new data frame, changing date to proper format, and bed number and warming to factors
-Herbivory <- read_csv("Data/Height_Herbivory_Measurements/Warming_Garden_Percent_Herbivory_2018.csv", 
+Herbivory <- read_csv("Height_Herbivory_Measurements/Warming_Garden_Percent_Herbivory_2018.csv", 
                       col_types = cols(bed_num = col_factor(levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16")), date = col_date(format = "%m/%d/%Y"), warming = col_factor(levels = c("1", "0")))) #might need to adjust date format (Y or y)
 
 #Read in csv into new data frame, changing bed_num and diversity to factors
-Treatment <- read_csv("Data/Height_Herbivory_Measurements/Diversity_Treatment_2018.csv",
+Treatment <- read_csv("Height_Herbivory_Measurements/Diversity_Treatment_2018.csv",
                       col_types = cols(bed_num = col_factor(levels = c("1","2", "3", "4", "5", "6", "7", "8","9", "10", "11", "12", "13", "14","15", "16")), diversity = col_factor(levels = c("1","2", "3", "0"))))
 
 #Read in csv into new data frame, changing bed_num and diversity to factors
-Aphids<-read_csv("Data/Aphids/2018_Insect_Counts.csv", 
+Aphids<-read_csv("Aphids/2018_Insect_Counts.csv", 
                  col_types = cols(Aphids = col_number(), Large_Ants = col_number(), Predator_Ladybug = col_number(),Predator_Spider = col_number(), Small_Ants = col_number(),bed_num = col_factor(levels = c("1","2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13","14", "15", "16")), date = col_date(format = "%m/%d/%Y"), warming = col_factor(levels = c("1", "0"))))%>%
   left_join(Treatment)
         
@@ -144,18 +144,18 @@ theme_update(axis.title.x=element_text(size=20, vjust=-0.35, margin=margin(t=15)
              panel.grid.minor=element_blank(), legend.title=element_text(face="bold"),
              legend.text=element_text(size=30), panel.background=element_rect((fill="white")))
 
-#Make plot from data frame individuals2 in order to graph the height of each plant by date with warming/not in two different colors
-ggplot(subset(Individuals2,height_cm!=9999), aes(date, height_cm, color=(warming)))+#filter out 9999
+#Make plot from data frame individuals2 in order to graph the height of each plant by date with warming/not in two different colors#
+ggplot(subset(Individuals2,height_cm<=800), aes(date, height_cm, color=(warming)))+#filter out 9999
   geom_jitter()+
   #Add smooth line across data
-  geom_smooth()+
+  geom_smooth(method="lm")+
   #Label the x-axis "Date"
   xlab("Date")+
   #Label the y-axis "Height (cm)"
   ylab("Height(cm)")
 
 #FACET WRAP Make plot from data frame individuals2 in order to graph the height of each plant by date with warming/not in two different colors
-ggplot(subset(Individuals2,height_cm!=9999), aes(date, height_cm, color=(diversity)))+#filter out 9999
+ggplot(subset(Individuals2,height_cm<=800), aes(date, height_cm, color=(diversity)))+#filter out 9999
   geom_jitter()+
   #Add smooth line across data
   geom_smooth(se=F)+
@@ -179,7 +179,7 @@ ggplot(Average_Height_Leaves, aes(as.factor(diversity), Height_avg,fill=warming)
 ggplot(subset(Individuals2,num_leaves!=9999), aes(date, num_leaves, color=as.factor(warming)))+
   geom_jitter()+
   #Add smooth line across data
-  geom_smooth()+
+  geom_smooth(method="lm")+
   #Label the x-axis "Date"
   xlab("Date")+
   #Label the y-axis "Number of Leaflets"
@@ -218,7 +218,7 @@ ggplot(subset(Individuals2, dmg_avg<=75 & date!="2018-08-23"), aes(date, dmg_avg
   expand_limits(y=50)
 
 #Make plot from data frame individuals2 in order to graph the average damage per leaf by date with warming/not in two different colors
-ggplot(subset(Individuals2, dmg_avg<=75& date!="2018-08-23"), aes(date, dmg_avg, color=as.factor(diversity)))+ #subsetted outliers ****need to be checked - % above 100
+ggplot(subset(Individuals2, dmg_avg<=75& date<="2018-08-23"), aes(date, dmg_avg, color=as.factor(diversity)))+ #subsetted outliers ****need to be checked - % above 100
   geom_jitter()+
   #Add smooth line across data
   geom_smooth(se=F)+
@@ -315,12 +315,15 @@ anova(Mixed_Model_Height)
 summary(Mixed_Model_Leaves<-lmer(num_leaves~diversity*warming*date+(1|plant_num),data=Individuals2))
 anova(Mixed_Model_Leaves)
 
-summary(Mixed_Model_Dmg<-lmer(dmg_avg~diversity*warming*date+(1|plant_num),data=subset(Individuals2, dmg_avg!="NA"& dmg_avg!="NaN"& dmg_avg!="Inf"& date!="2018-08-23")))
+summary(Mixed_Model_Flowers2<-lmer(num_flowers~diversity*warming*date+(1|plant_num),data=subset(Individuals2, date>"2018-08-15")))
+anova(Mixed_Model_Flowers2)
+
+summary(Mixed_Model_Dmg<-lmer(dmg_avg~diversity*warming*date+(1|plant_num),data=subset(Individuals2, dmg_avg!="NA"& dmg_avg!="NaN"& dmg_avg!="Inf"& date<="2018-08-23")))
 anova(Mixed_Model_Dmg)
 
-summary (Mixed_Model_Pods_09_07 <- lmer(num_pods~diversity*warming+(1|bed_num),data = subset(Pod_Number, date=="2018-09-07"&num_pods!=9999)))
-anova(Mixed_Model_Pods)
+summary (Mixed_Model_Pods_09_07<- lmer(num_pods~diversity*warming+(1|bed_num),data = subset(Pod_Number, date=="2018-09-07"&num_pods!=9999)))
+anova(Mixed_Model_Pods_09_07)
 
 
 summary (Mixed_Model_Pods_09_20 <- lmer(num_pods~diversity*warming+(1|bed_num),data = subset(Pod_Number, date=="2018-09-20"&num_pods!=9999)))
-anova(Mixed_Model_Pods)
+anova(Mixed_Model_Pods_09_20)
