@@ -2,7 +2,7 @@ library(tidyverse)
 library(lme4)
 library(lmerTest)
 
-setwd('C:\\Users\\lapie\\Dropbox (Smithsonian)\\SERC\\interns\\2018\\2018_REU_Esch')
+setwd('C:\\Users\\lapie\\Dropbox (Smithsonian)\\SERC\\interns\\2018\\2018_REU_Esch\\final data_komatsu approved')
 
 theme_set(theme_bw())
 theme_update(axis.title.x=element_text(size=20, vjust=-0.35), axis.text.x=element_text(size=16),
@@ -52,7 +52,7 @@ biomass <- read.csv('Inside_biomass.csv')%>%
   mutate(total_biomass=shoot+root)
 
 ###repeated measures ANOVA for height
-summary(heightRManova <- lmer(height ~ diversity_treatment*herbivory*date + (1+pot|date), data=subset(growth, diversity_treatment!=0)))
+summary(heightRManova <- lmer(height ~ diversity_treatment*herbivory + (1+pot|date), data=subset(growth, diversity_treatment!=0)))
 
 ggplot(data=barGraphStats(data=subset(growth, date=='7/23/18' & diversity_treatment!=0), variable="height", byFactorNames=c("diversity_treatment", "herbivory")), aes(x=as.factor(diversity_treatment), y=mean, fill=herbivory)) +
   geom_bar(stat='identity', position=position_dodge()) +
@@ -63,7 +63,7 @@ ggplot(data=barGraphStats(data=subset(growth, date=='7/23/18' & diversity_treatm
 
 
 ###repeated measures ANOVA for leaf number
-summary(leavesRManova <- lmer(num_leaves ~ diversity_treatment*herbivory*date + (1+pot|date), data=subset(growth, diversity_treatment!=0)))
+summary(leavesRManova <- lmer(num_leaves ~ diversity_treatment*herbivory + (1+pot|date), data=subset(growth, diversity_treatment!=0)))
 
 ggplot(data=barGraphStats(data=subset(growth, date=='7/23/18' & diversity_treatment!=0), variable="num_leaves", byFactorNames=c("diversity_treatment", "herbivory")), aes(x=as.factor(diversity_treatment), y=mean, fill=herbivory)) +
   geom_bar(stat='identity', position=position_dodge()) +
@@ -113,10 +113,17 @@ ggplot(data=barGraphStats(data=subset(biomass, diversity_treatment!=0), variable
   ylab('Total Biomass (g)') +
   scale_fill_manual(values=c('dark orange', 'dark green', 'dark blue'))
 
+ggplot(data=barGraphStats(data=subset(biomass, diversity_treatment!=0), variable="total_biomass", byFactorNames=c("diversity_treatment", "herbivory")), aes(x=as.factor(diversity_treatment), y=mean, color=herbivory)) +
+  geom_point(size=5, position=position_dodge(0.9)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Rhizobial Strain Number') +
+  ylab('Total Biomass (g)') +
+  scale_color_manual(values=c('dark orange', 'dark green', 'dark blue'))
+#export at 665 x 610
 
 ###monocultures only
 ###repeated measures ANOVA for height
-summary(heightRManova <- lmer(height ~ diversity_description*herbivory*date + (1+pot|date), data=subset(growth, diversity_treatment==1)))
+summary(heightRManova <- lmer(height ~ diversity_description*herbivory + (1+pot|date), data=subset(growth, diversity_treatment==1)))
 
 ggplot(data=barGraphStats(data=subset(growth, date=='7/23/18' & diversity_treatment==1), variable="height", byFactorNames=c("diversity_description", "herbivory")), aes(x=as.factor(diversity_description), y=mean, fill=herbivory)) +
   geom_bar(stat='identity', position=position_dodge()) +
@@ -128,7 +135,7 @@ ggplot(data=barGraphStats(data=subset(growth, date=='7/23/18' & diversity_treatm
 #export at 800x800
 
 ###repeated measures ANOVA for leaf number
-summary(leavesRManova <- lmer(num_leaves ~ diversity_description*herbivory*date + (1+pot|date), data=subset(growth, diversity_treatment==1)))
+summary(leavesRManova <- lmer(num_leaves ~ diversity_description*herbivory + (1+pot|date), data=subset(growth, diversity_treatment==1)))
 
 ggplot(data=barGraphStats(data=subset(growth, date=='7/23/18' & diversity_treatment==1), variable="num_leaves", byFactorNames=c("diversity_description", "herbivory")), aes(x=as.factor(diversity_description), y=mean, fill=herbivory)) +
   geom_bar(stat='identity', position=position_dodge()) +
@@ -139,7 +146,7 @@ ggplot(data=barGraphStats(data=subset(growth, date=='7/23/18' & diversity_treatm
   scale_fill_manual(values=c('dark orange', 'dark green', 'dark blue'))
 #export at 800x800
 
-###repeated measures ANOVA for nodule number
+###ANOVA for nodule number
 summary(nodulesGLM <- aov(nodules ~ diversity_description*herbivory, data=subset(nodules, diversity_treatment!=0)))
 
 ggplot(data=barGraphStats(data=subset(nodules, diversity_treatment==1), variable="nodules", byFactorNames=c("diversity_description", "herbivory")), aes(x=as.factor(diversity_description), y=mean, fill=herbivory)) +

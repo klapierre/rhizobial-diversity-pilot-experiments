@@ -123,6 +123,21 @@ ggplot(data=barGraphStats(data=subset(growthData, date %in% c('7/27/2018', '8/23
 #export at 1200 x 600
 
 
+# ggplot(data=subset(growthData, date %in% c('7/27/2018', '8/23/2018') & diversity!=0), aes(x=as.factor(diversity), y=height_cm, color=as.factor(warming))) +
+#   geom_boxplot() +
+#   geom_point() +
+#   scale_color_manual(values=c('#0072B2', '#D55E00'),
+#                      breaks=c(0,1),
+#                      labels=c('Control', 'Drought')) +
+#   xlab('Rhizobial Diversity') + ylab('Height (cm)') +
+#   theme(axis.title.y=element_text(vjust=1)) +
+#   facet_wrap(~date, scales='free') +
+#   theme(strip.text.x = element_text(size=20),
+#         strip.background = element_rect(colour="black", fill="white"),
+#         panel.spacing = unit(2, "lines"))
+# #export at 1200 x 600
+
+
 # ggplot(data=barGraphStats(data=subset(growthRelative, date %in% c('7/27/2018', '8/23/2018') & !is.na(height_rel)), variable="height_rel", byFactorNames=c("date", "warming", "diversity")), aes(x=as.factor(warming), y=mean, fill=as.factor(diversity))) + 
 #   geom_bar(stat='identity', position=position_dodge()) +
 #   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
@@ -350,5 +365,97 @@ ggplot(data=barGraphStats(data=subset(insectData, Aphids<9000&diversity!=0), var
                      breaks=c(0,1),
                      labels=c('Control', 'Drought')) +
   xlab('Rhizobial Diversity') + ylab('Aphid Number') +
+  theme(axis.title.y=element_text(vjust=1))
+#export at 665 x 610
+
+
+#######
+#monocultures-----------
+#insect number
+summary(glm(Aphids~strains*warming, data=subset(insectData, Aphids<9000&diversity==1))) #warming and diversity interaction
+
+ggplot(data=barGraphStats(data=subset(insectData, Aphids<9000&diversity==1), variable="Aphids", byFactorNames=c("warming", "strains")), aes(x=as.factor(strains), y=mean, color=as.factor(warming))) +
+  geom_point(size=5, position=position_dodge(width=0.25)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
+  scale_color_manual(values=c('#0072B2', '#D55E00'),
+                     breaks=c(0,1),
+                     labels=c('Control', 'Drought')) +
+  xlab('Rhizobial Strain') + ylab('Aphid Number') +
+  theme(axis.title.y=element_text(vjust=1))
+#export at 665 x 610
+
+
+###insect herbivory---------
+summary(lmer(avg_perc_herbivory~strains*warming + (1|date), data=subset(herbivoryData, diversity==1))) #no effect
+summary(glm(avg_perc_herbivory~strains*warming, data=subset(herbivoryData, date=='7/27/2018'&diversity==1))) #no effect
+summary(glm(avg_perc_herbivory~strains, data=subset(herbivoryData, date=='7/27/2018'&warming==0&diversity==1))) #no effect 
+summary(glm(avg_perc_herbivory~strains, data=subset(herbivoryData, date=='7/27/2018'&warming==1&diversity==1))) #no effect
+summary(glm(avg_perc_herbivory~strains*warming, data=subset(herbivoryData, date=='8/23/2018'&diversity==1))) #no effect
+
+ggplot(data=barGraphStats(data=subset(herbivoryData, date %in% c('7/27/2018', '8/23/2018') & diversity==1), variable="avg_perc_herbivory", byFactorNames=c("date", "warming", "strains")), aes(x=as.factor(strains), y=mean, color=as.factor(warming))) +
+  geom_point(size=5, position=position_dodge(width=0.25)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
+  scale_color_manual(values=c('#0072B2', '#D55E00'),
+                     breaks=c(0,1),
+                     labels=c('Control', 'Drought')) +
+  xlab('Rhizobial Strain') + ylab('Invertebrate Herbivory (%)') +
+  theme(axis.title.y=element_text(vjust=1)) +
+  facet_wrap(~date, scales='free') +
+  theme(strip.text.x = element_text(size=20),
+        strip.background = element_rect(colour="black", fill="white"),
+        panel.spacing = unit(2, "lines"))
+#export at 665 x 610
+
+
+###rabbit herbivory---------
+summary(glm(percent_rabbit_herb~strains*warming, data=subset(rabbitData, diversity==1))) #no effect
+summary(glm(percent_rabbit_herb~strains, data=subset(rabbitData, warming==0&diversity==1))) #no effect 
+summary(glm(percent_rabbit_herb~strains, data=subset(rabbitData, warming==1&diversity==1))) #no effect
+
+ggplot(data=barGraphStats(data=subset(rabbitData, date=='7/19/2018'&diversity==1), variable="percent_rabbit_herb", byFactorNames=c("date", "warming", "strains")), aes(x=as.factor(strains), y=mean, color=as.factor(warming))) +
+  geom_point(size=5, position=position_dodge(width=0.25)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
+  scale_color_manual(values=c('#0072B2', '#D55E00'),
+                     breaks=c(0,1),
+                     labels=c('Control', 'Drought')) +
+  xlab('Rhizobial Strain') + ylab('Rabbit Herbivory (%)') +
+  theme(axis.title.y=element_text(vjust=1)) +
+  facet_wrap(~date, scales='free') +
+  theme(strip.text.x = element_text(size=20),
+        strip.background = element_rect(colour="black", fill="white"),
+        panel.spacing = unit(2, "lines"))
+#export at 665 x 610
+
+
+#height absolute
+summary(lmer(height_cm~strains*warming + (1|date), data=subset(growthData, diversity==1))) #warming effect
+summary(glm(height_cm~strains*warming, data=subset(growthData, date=='7/27/2018'&diversity==1))) #early season, strain 4 is different
+summary(glm(height_cm~strains*warming, data=subset(growthData, date=='8/23/2018'&diversity==1))) #end of season, strain 4 is different
+
+ggplot(data=barGraphStats(data=subset(growthData, date %in% c('7/27/2018', '8/23/2018') & diversity==1), variable="height_cm", byFactorNames=c("date", "warming", "strains")), aes(x=as.factor(strains), y=mean, color=as.factor(warming))) +
+  geom_point(size=5) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2) +
+  scale_color_manual(values=c('#0072B2', '#D55E00'),
+                     breaks=c(0,1),
+                     labels=c('Control', 'Drought')) +
+  xlab('Rhizobial Strain') + ylab('Height (cm)') +
+  theme(axis.title.y=element_text(vjust=1)) +
+  facet_wrap(~date, scales='free') +
+  theme(strip.text.x = element_text(size=20),
+        strip.background = element_rect(colour="black", fill="white"),
+        panel.spacing = unit(2, "lines"))
+#export at 1200 x 600
+
+
+#total pods
+summary(glm(total_pods~strains*warming, data=subset(fitnessData, total_pods<9000&diversity==1))) #no effect
+
+ggplot(data=barGraphStats(data=subset(fitnessData, total_pods<9000&diversity==1), variable="total_pods", byFactorNames=c("warming", "strains")), aes(x=as.factor(strains), y=mean, color=as.factor(warming))) +
+  geom_point(size=5, position=position_dodge(width=0.25)) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
+  scale_color_manual(values=c('#0072B2', '#D55E00'),
+                     breaks=c(0,1),
+                     labels=c('Control', 'Drought')) +
+  xlab('Rhizobial Strain') + ylab('Total Pod Number') +
   theme(axis.title.y=element_text(vjust=1))
 #export at 665 x 610
