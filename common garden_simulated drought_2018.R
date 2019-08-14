@@ -459,3 +459,78 @@ ggplot(data=barGraphStats(data=subset(fitnessData, total_pods<9000&diversity==1)
   xlab('Rhizobial Strain') + ylab('Total Pod Number') +
   theme(axis.title.y=element_text(vjust=1))
 #export at 665 x 610
+
+
+#######
+#selection vs complementarity-----------
+#insect number
+monoAphids <- insectData%>%
+  filter(diversity==1&Aphids<9000)%>%
+  group_by(warming, strains)%>%
+  summarise(mono_aphid=mean(Aphids))%>%
+  ungroup()%>%
+  mutate(strains2=paste('strain', strains, sep='_'))%>%
+  select(-strains)%>%
+  spread(key=strains2, value=mono_aphid)
+expectedAphids <- insectData%>%
+  left_join(monoAphids)%>%
+  mutate(expected_aphids=(strain_1*USDA_110 + strain_2*USDA_76 + strain_3*USDA_136 + strain_4*USDA_138)/diversity)%>%
+  select(bed, plant, diversity, strains, warming, Aphids, expected_aphids)%>%
+  rename(observed_aphids=Aphids)%>%
+  gather(key='type', value='number', observed_aphids, expected_aphids)
+
+ggplot(data=barGraphStats(data=subset(expectedAphids, number<9000&diversity!=0&warming==1), variable="number", byFactorNames=c("type", "diversity", "strains")), aes(x=as.factor(diversity), y=mean, shape=as.factor(type))) +
+  geom_point(size=5, position=position_dodge(width=0.25), color='#D55E00') +
+  scale_shape_manual(values=c(17, 16),
+                     breaks=c('expected_aphids', 'observed_aphids'),
+                     labels=c('expected', 'observed')) +
+  xlab('Rhizobial Diversity') + ylab('Aphid Number') +
+  theme(axis.title.y=element_text(vjust=1))
+#export at 665 x 610
+
+ggplot(data=barGraphStats(data=subset(expectedAphids, number<9000&diversity!=0&warming==1), variable="number", byFactorNames=c("type", "diversity")), aes(x=as.factor(diversity), y=mean, shape=as.factor(type))) +
+  geom_point(size=5, position=position_dodge(width=0.25), color='#D55E00') +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2, color='#D55E00') +
+  scale_shape_manual(values=c(17, 16),
+                     breaks=c('expected_aphids', 'observed_aphids'),
+                     labels=c('expected', 'observed')) +
+  xlab('Rhizobial Diversity') + ylab('Aphid Number') +
+  theme(axis.title.y=element_text(vjust=1))
+#export at 665 x 610
+
+
+###insect herbivory---------
+monoChew <- herbivoryData%>%
+  filter(diversity==1&date=='7/27/2018')%>%
+  group_by(warming, strains)%>%
+  summarise(mono_chew=mean(avg_perc_herbivory))%>%
+  ungroup()%>%
+  mutate(strains2=paste('strain', strains, sep='_'))%>%
+  select(-strains)%>%
+  spread(key=strains2, value=mono_chew)
+expectedChew <- herbivoryData%>%
+  filter(date=='7/27/2018')%>%
+  left_join(monoChew)%>%
+  mutate(expected_chew=(strain_1*USDA_110 + strain_2*USDA_76 + strain_3*USDA_136 + strain_4*USDA_138)/diversity)%>%
+  select(date, bed, plant, diversity, strains, warming, avg_perc_herbivory, expected_chew)%>%
+  rename(observed_chew=avg_perc_herbivory)%>%
+  gather(key='type', value='number', observed_chew, expected_chew)
+
+ggplot(data=barGraphStats(data=subset(expectedChew, date %in% c('7/27/2018') & diversity!=0), variable="number", byFactorNames=c("type", "diversity", "strains")), aes(x=as.factor(diversity), y=mean, shape=as.factor(type))) +
+  geom_point(size=5, position=position_dodge(width=0.25), color='#D55E00') +
+  scale_shape_manual(values=c(17, 16),
+                     breaks=c('expected_chew', 'observed_chew'),
+                     labels=c('expected', 'observed')) +
+  xlab('Rhizobial Diversity') + ylab('Invertebrate Herbivory (%)') +
+  theme(axis.title.y=element_text(vjust=1))
+#export at 665 x 610
+
+ggplot(data=barGraphStats(data=subset(expectedChew, date %in% c('7/27/2018') & diversity!=0), variable="number", byFactorNames=c("type", "diversity")), aes(x=as.factor(diversity), y=mean, shape=as.factor(type))) +
+  geom_point(size=5, position=position_dodge(width=0.25), color='#D55E00') +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2, color='#D55E00') +
+  scale_shape_manual(values=c(17, 16),
+                     breaks=c('expected_chew', 'observed_chew'),
+                     labels=c('expected', 'observed')) +
+  xlab('Rhizobial Diversity') + ylab('Invertebrate Herbivory (%)') +
+  theme(axis.title.y=element_text(vjust=1))
+#export at 665 x 610
