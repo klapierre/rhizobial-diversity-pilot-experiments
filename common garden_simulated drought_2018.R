@@ -184,7 +184,7 @@ leavesPreRabbit <- growthData%>%
 rabbitData <- growthData%>%
   filter(date=='7/19/2018')%>%
   left_join(leavesPreRabbit)%>%
-  mutate(percent_rabbit_herb=(num_leaves_pre-num_leaves)/num_leaves_pre)
+  mutate(percent_rabbit_herb=(num_leaves_pre-num_leaves)/num_leaves_pre*100)
 
 summary(glm(percent_rabbit_herb~diversity*warming, data=subset(rabbitData, diversity!=0))) #no effect
 summary(glm(percent_rabbit_herb~diversity, data=subset(rabbitData, warming==0))) #marginally sig diversity effect 
