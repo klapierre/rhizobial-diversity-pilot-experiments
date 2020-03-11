@@ -49,66 +49,47 @@ barGraphStats <- function(data, variable, byFactorNames) {
 
 ###read in data
 trt <- read.csv('soy pilot_2018_common garden_treatments.csv')
+
 growthData <- read.csv('soy pilot_2018_common garden_growth.csv')%>%
   left_join(trt)%>%
-  filter(height_cm<9000, num_leaves<9000)
+  filter(height_cm<9000, num_leaves<9000)%>%
+  rename(num_leaflets=num_leaves)%>% #leaflets were counted, divide by 3 to get num leaves
+  mutate(num_leaves=num_leaflets/3)%>%
+  select(-num_rabbit_herb)%>% #drop num_rabbit_herb, which is number of stems removed by rabbit (counted as clipped stems, which is not very accurate if the rabbit clipped a branch with many higher stems); will calculate num leaves removed by rabbit later on
+  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=paste('doy', strftime(date2, format = "%j"), sep='_'))
+
 herbivoryData <- read.csv('soy pilot_2018_common garden_herbivory.csv')%>%
   filter(perc_herbivory<9000)%>%
-  #calculate avg herbivory per leaf
+  #calculate avg chewing insect herbivory per leaf
   group_by(bed, plant, date)%>%
-  summarise(sum_perc_herbivory=sum(perc_herbivory))%>%
+  summarise(sum_perc_herbivory=sum(perc_herbivory), mean_perc_herbivory=mean(perc_herbivory))%>%
   ungroup()%>%
   left_join(growthData)%>%
-  mutate(avg_perc_herbivory=sum_perc_herbivory/num_leaves)%>%
-  filter(!is.na(avg_perc_herbivory), avg_perc_herbivory<100000)
+  mutate(avg_perc_herbivory=sum_perc_herbivory/num_leaflets)%>%
+  filter(!is.na(avg_perc_herbivory), avg_perc_herbivory<100000)%>%
+  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=paste('doy', strftime(date2, format = "%j"), sep='_'))
+
 insectData <- read.csv('soy pilot_2018_common garden_insects.csv')%>%
-  left_join(trt)
+  left_join(trt)%>%
+  filter(Aphids<9000)%>%
+  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=paste('doy', strftime(date2, format = "%j"), sep='_'))
+
 fitnessData <- read.csv('soy pilot_2018_common garden_pods.csv')%>%
   select(-comments)%>%
   left_join(read.csv('soy pilot_2018_common garden_bean weight.csv'))%>%
   select(-notes)%>%
   left_join(trt)%>%
-  mutate(viable_pods=total_pods-aborted_pods)
-
-#relative to rhizobial controls
-growthRelative <- growthData%>%
-  filter(diversity==0)%>%
-  rename(height_ctl=height_cm, num_flowers_ctl=num_flowers, num_pods_ctl=num_pods)%>%
-  select(bed, date, warming, height_ctl, num_flowers_ctl, num_pods_ctl)%>%
-  right_join(growthData)%>%
-  filter(diversity!=0)%>%
-  mutate(height_rel=(height_cm-height_ctl)/height_ctl, flw_rel=(num_flowers-num_flowers_ctl)/num_flowers_ctl, pods_rel=(num_pods-num_pods_ctl)/num_pods_ctl)
+  filter(total_pods<9000)%>%
+  filter(aborted_pods<9000)%>%
+  mutate(viable_pods=total_pods-aborted_pods)%>%
+  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=paste('doy', strftime(date2, format = "%j"), sep='_'))
 
 
 ###height---------
 #height absolute
-summary(lmer(height_cm~diversity*warming + (1|date), data=growthData)) #warming effect
-summary(glm(height_cm~diversity*warming, data=subset(growthData, date=='7/27/2018'&diversity!=0))) #interactive effect
-      summary(glm(height_cm~diversity, data=subset(growthData, date=='7/27/2018'&warming==0))) #diversity increases height
-      summary(glm(height_cm~diversity, data=subset(growthData, date=='7/27/2018'&warming==1))) #no significant effect
-summary(glm(height_cm~diversity*warming, data=subset(growthData, date=='8/23/2018'&diversity!=0))) #end of season, no differences anymore
+summary(lmer(height_cm~diversity*warming + (1|doy), data=subset(growthData, diversity!=0))) #diversity and warming effect, marg interaction
 
-# #height relative to rhizobial control
-# summary(lmer(height_rel~diversity*warming + (1|date), data=growthRelative)) #warming effect
-# summary(glm(height_rel~diversity*warming, data=subset(growthRelative, date=='7/27/2018'))) #interative effects (div increases height in unwarmed, but no effect on height in warmed)
-#       summary(glm(height_rel~diversity, data=subset(growthRelative, date=='7/27/2018'&warming==0))) #diversity increases height
-#       summary(glm(height_rel~diversity, data=subset(growthRelative, date=='7/27/2018'&warming==1))) #no significant effect
-# summary(glm(height_rel~diversity*warming, data=subset(growthRelative, date=='8/23/2018'))) #end of season, no differences anymore
-
-# ggplot(data=barGraphStats(data=subset(growthRelative, !is.na(height_rel)), variable="height_rel", byFactorNames=c("date", "warming", "diversity")), aes(x=diversity, y=mean, color=as.factor(warming))) +
-#   geom_point() +
-#   geom_errorbar(aes(ymin=mean-se, ymax=mean+se)) +
-#   scale_color_manual(values=c('#0072B2', '#D55E00')) +
-#   facet_wrap(~date, scales='free')
-
-# ggplot(data=barGraphStats(data=subset(growthRelative, date %in% c('7/27/2018', '8/23/2018') & !is.na(height_rel)), variable="height_rel", byFactorNames=c("date", "warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) + 
-#   geom_point(size=5, position=position_dodge(width=0.25)) +
-#   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
-#   scale_color_manual(values=c('#0072B2', '#D55E00')) +
-#   xlab('Rhizobial Diversity') + ylab('Height Relative to Control') +
-#   facet_wrap(~date, scales='free')
-
-ggplot(data=barGraphStats(data=subset(growthData, date %in% c('7/27/2018', '8/23/2018') & diversity!=0), variable="height_cm", byFactorNames=c("date", "warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) +
+ggplot(data=barGraphStats(data=subset(growthData, diversity!=0), variable="height_cm", byFactorNames=c("doy", "warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) +
     geom_point(size=5) +
     geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2) +
     scale_color_manual(values=c('#0072B2', '#D55E00'),
@@ -116,12 +97,28 @@ ggplot(data=barGraphStats(data=subset(growthData, date %in% c('7/27/2018', '8/23
                        labels=c('Control', 'Drought')) +
     xlab('Rhizobial Diversity') + ylab('Height (cm)') +
     theme(axis.title.y=element_text(vjust=1)) +
-    facet_wrap(~date, scales='free') +
+    facet_wrap(~doy, scales='free') +
     theme(strip.text.x = element_text(size=20),
           strip.background = element_rect(colour="black", fill="white"),
           panel.spacing = unit(2, "lines"))
 #export at 1200 x 600
 
+###START HERE: what to do for height? show early vs late in ms and time in appendix? time series obscured diversity and warming pattern
+#also consider doing growth (subtract height from one date to next) instead of height
+
+ggplot(data=barGraphStats(data=subset(growthData, diversity!=0), variable="height_cm", byFactorNames=c("doy", "warming", "diversity")), aes(x=doy, y=mean, color=as.factor(diversity))) +
+  geom_point(size=5) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2) +
+  # scale_color_manual(values=c('#0072B2', '#D55E00'),
+                     # breaks=c(0,1),
+                     # labels=c('Control', 'Drought')) +
+  xlab('Rhizobial Diversity') + ylab('Height (cm)') +
+  theme(axis.title.y=element_text(vjust=1)) +
+  facet_wrap(~warming, scales='free') +
+  theme(strip.text.x = element_text(size=20),
+        strip.background = element_rect(colour="black", fill="white"),
+        panel.spacing = unit(2, "lines"))
+#export at 1200 x 600
 
 # ggplot(data=subset(growthData, date %in% c('7/27/2018', '8/23/2018') & diversity!=0), aes(x=as.factor(diversity), y=height_cm, color=as.factor(warming))) +
 #   geom_boxplot() +
@@ -154,14 +151,13 @@ summary(glm(num_leaves~diversity*warming, data=subset(growthData, date=='8/23/20
 
 ###insect herbivory---------
 summary(lmer(avg_perc_herbivory~diversity*warming + (1|date), data=herbivoryData)) #marginally significant interaction
-summary(glm(avg_perc_herbivory~diversity*warming, data=subset(herbivoryData, date=='7/27/2018'&diversity!=0))) #no effect
-summary(glm(avg_perc_herbivory~diversity, data=subset(herbivoryData, date=='7/27/2018'&warming==0))) #no effect 
-summary(glm(avg_perc_herbivory~diversity, data=subset(herbivoryData, date=='7/27/2018'&warming==1))) #no effect
-summary(glm(avg_perc_herbivory~diversity*warming, data=subset(herbivoryData, date=='8/23/2018'&diversity!=0))) #no effect
+summary(glm(avg_perc_herbivory~diversity*warming, data=subset(herbivoryData, date=='7/11/2018'))) #no effect
+summary(glm(avg_perc_herbivory~diversity, data=subset(herbivoryData, date=='7/11/2018'&warming==0))) #no effect 
+summary(glm(avg_perc_herbivory~diversity, data=subset(herbivoryData, date=='7/11/2018'&warming==1))) #no effect
+summary(glm(avg_perc_herbivory~diversity*warming, data=subset(herbivoryData, date=='8/9/2018'))) #no effect
 
-summary(lmer(avg_perc_herbivory~diversity*warming + (1|date), data=herbivoryData)) #marginally significant
 
-ggplot(data=barGraphStats(data=subset(herbivoryData, date %in% c('7/27/2018', '8/23/2018') & diversity!=0), variable="avg_perc_herbivory", byFactorNames=c("date", "warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) +
+ggplot(data=barGraphStats(data=subset(herbivoryData, date %in% c('7/27/2018', '8/9/2018')), variable="avg_perc_herbivory", byFactorNames=c("date", "warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) +
   geom_point(size=5, position=position_dodge(width=0.25)) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
   scale_color_manual(values=c('#0072B2', '#D55E00'),
@@ -226,11 +222,11 @@ ggplot(data=barGraphStats(data=subset(growthData, date=='8/23/2018'&diversity!=0
 
 ###pods---------
 #total pods
-summary(glm(total_pods~diversity*warming, data=subset(fitnessData, total_pods<9000&diversity!=0))) #no effect
+summary(glm(total_pods~diversity*warming, data=subset(fitnessData, total_pods<9000))) #no effect
 summary(glm(total_pods~diversity, data=subset(fitnessData, total_pods<9000&warming==0))) #no effect
 summary(glm(total_pods~diversity, data=subset(fitnessData, total_pods<9000&warming==1))) #no effect
 
-ggplot(data=barGraphStats(data=subset(fitnessData, total_pods<9000&diversity!=0), variable="total_pods", byFactorNames=c("warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) +
+ggplot(data=barGraphStats(data=subset(fitnessData, total_pods<9000), variable="total_pods", byFactorNames=c("warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) +
   geom_point(size=5, position=position_dodge(width=0.25)) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
   scale_color_manual(values=c('#0072B2', '#D55E00'),
