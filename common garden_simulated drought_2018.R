@@ -8,6 +8,7 @@
 library(lme4)
 library(lmerTest)
 library(grid)
+library(performance)
 library(tidyverse)
 
 #laptop
@@ -25,7 +26,6 @@ theme_update(axis.title.x=element_text(size=20, vjust=-0.35), axis.text.x=elemen
 
 ###bar graph summary statistics function
 #barGraphStats(data=, variable="", byFactorNames=c(""))
-
 barGraphStats <- function(data, variable, byFactorNames) {
   count <- length(byFactorNames)
   N <- aggregate(data[[variable]], data[byFactorNames], FUN=length)
@@ -43,23 +43,36 @@ barGraphStats <- function(data, variable, byFactorNames) {
   return(finalSummaryStats)
 }
 
+#not in function
+`%!in%` = Negate(`%in%`)
 
 ###########################################################################
 ###########################################################################
 
 ###read in data
 trt <- read.csv('soy pilot_2018_common garden_treatments.csv')
-
+  
 growthData <- read.csv('soy pilot_2018_common garden_growth.csv')%>%
   left_join(trt)%>%
+  select(-num_flowers, -num_pods)%>%
   filter(height_cm<9000, num_leaves<9000)%>%
+  filter(plant %!in% c(635,900,1062,1073,2557))%>% #drop plants that died
   rename(num_leaflets=num_leaves)%>% #leaflets were counted, divide by 3 to get num leaves
   mutate(num_leaves=num_leaflets/3)%>%
   select(-num_rabbit_herb)%>% #drop num_rabbit_herb, which is number of stems removed by rabbit (counted as clipped stems, which is not very accurate if the rabbit clipped a branch with many higher stems); will calculate num leaves removed by rabbit later on
-  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=paste('doy', strftime(date2, format = "%j"), sep='_'))
+  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=strftime(date2, format = "%j"))
+
+growthRate <- growthData%>%
+  mutate(doy_cat=paste('doy', doy, sep='_'))%>%
+  select(doy_cat, bed, warming, plant, treatment_code, strains, diversity, USDA_110, USDA_76, USDA_136, USDA_138, height_cm)%>%
+  spread(key=doy_cat, value=height_cm)%>%
+  mutate(rate_1=(doy_186-doy_179)/(186-179), rate_2=(doy_192-doy_186)/(192-186), rate_3=(doy_200-doy_192)/(200-192), rate_4=(doy_208-doy_200)/(208-200), rate_5=(doy_214-doy_208)/(214-208), rate_6=(doy_221-doy_214)/(221-214), rate_7=(doy_235-doy_221)/(235-221), rate_8=(doy_253-doy_235)/(253-235))%>%
+  select(bed, warming, plant, treatment_code, strains, diversity, USDA_110, USDA_76, USDA_136, USDA_138, rate_1, rate_2, rate_3, rate_4, rate_5, rate_6, rate_7, rate_8)%>%
+  gather(key=rate_period, value=growth_rate, rate_1:rate_8)
 
 herbivoryData <- read.csv('soy pilot_2018_common garden_herbivory.csv')%>%
   filter(perc_herbivory<9000)%>%
+  filter(plant %!in% c(635,900,1062,1073,2557))%>% #drop plants that died
   #calculate avg chewing insect herbivory per leaf
   group_by(bed, plant, date)%>%
   summarise(sum_perc_herbivory=sum(perc_herbivory), mean_perc_herbivory=mean(perc_herbivory))%>%
@@ -67,12 +80,20 @@ herbivoryData <- read.csv('soy pilot_2018_common garden_herbivory.csv')%>%
   left_join(growthData)%>%
   mutate(avg_perc_herbivory=sum_perc_herbivory/num_leaflets)%>%
   filter(!is.na(avg_perc_herbivory), avg_perc_herbivory<100000)%>%
-  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=paste('doy', strftime(date2, format = "%j"), sep='_'))
+  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=strftime(date2, format = "%j"))
 
 insectData <- read.csv('soy pilot_2018_common garden_insects.csv')%>%
   left_join(trt)%>%
   filter(Aphids<9000)%>%
-  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=paste('doy', strftime(date2, format = "%j"), sep='_'))
+  filter(plant %!in% c(635,900,1062,1073,2557))%>% #drop plants that died
+  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=strftime(date2, format = "%j"))
+
+flowerData <- read.csv('soy pilot_2018_common garden_growth.csv')%>%
+  left_join(trt)%>%
+  select(-height_cm, -num_leaves)%>%
+  filter(num_flowers<9000, num_pods<9000)%>%
+  filter(plant %!in% c(635,900,1062,1073,2557))%>% #drop plants that died
+  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=strftime(date2, format = "%j"))
 
 fitnessData <- read.csv('soy pilot_2018_common garden_pods.csv')%>%
   select(-comments)%>%
@@ -81,15 +102,24 @@ fitnessData <- read.csv('soy pilot_2018_common garden_pods.csv')%>%
   left_join(trt)%>%
   filter(total_pods<9000)%>%
   filter(aborted_pods<9000)%>%
+  filter(plant %!in% c(635,900,1062,1073,2557))%>% #drop plants that died
   mutate(viable_pods=total_pods-aborted_pods)%>%
-  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=paste('doy', strftime(date2, format = "%j"), sep='_'))
+  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=strftime(date2, format = "%j"))
 
 
-###height---------
-#height absolute
-summary(lmer(height_cm~diversity*warming + (1|doy), data=subset(growthData, diversity!=0))) #diversity and warming effect, marg interaction
+###height--------- for all growth analyses, don't use doy=200, which is the measurement immediately following rabbit herbivory
+##height absolute
+#data check
+ggplot(data=growthData, aes(x=doy, y=height_cm)) +
+  geom_point() +
+  facet_wrap(~plant)
 
-ggplot(data=barGraphStats(data=subset(growthData, diversity!=0), variable="height_cm", byFactorNames=c("doy", "warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) +
+#model
+summary(heightModel <- lmer(log(height_cm)~diversity*warming + (1|bed/plant), data=subset(growthData, doy!=200))) #no effects (similarly no effects for either before or after rabbit event time series)
+check_model(heightModel)
+
+#facet by doy
+ggplot(data=barGraphStats(data=growthData, variable="height_cm", byFactorNames=c("doy", "warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) +
     geom_point(size=5) +
     geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2) +
     scale_color_manual(values=c('#0072B2', '#D55E00'),
@@ -103,61 +133,99 @@ ggplot(data=barGraphStats(data=subset(growthData, diversity!=0), variable="heigh
           panel.spacing = unit(2, "lines"))
 #export at 1200 x 600
 
-###START HERE: what to do for height? show early vs late in ms and time in appendix? time series obscured diversity and warming pattern
-#also consider doing growth (subtract height from one date to next) instead of height
-
+#facet by warming
 ggplot(data=barGraphStats(data=subset(growthData, diversity!=0), variable="height_cm", byFactorNames=c("doy", "warming", "diversity")), aes(x=doy, y=mean, color=as.factor(diversity))) +
   geom_point(size=5) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2) +
   # scale_color_manual(values=c('#0072B2', '#D55E00'),
                      # breaks=c(0,1),
                      # labels=c('Control', 'Drought')) +
-  xlab('Rhizobial Diversity') + ylab('Height (cm)') +
+  xlab('Day of Year') + ylab('Height (cm)') +
   theme(axis.title.y=element_text(vjust=1)) +
-  facet_wrap(~warming, scales='free') +
+  facet_wrap(~warming) +
   theme(strip.text.x = element_text(size=20),
         strip.background = element_rect(colour="black", fill="white"),
         panel.spacing = unit(2, "lines"))
 #export at 1200 x 600
 
-# ggplot(data=subset(growthData, date %in% c('7/27/2018', '8/23/2018') & diversity!=0), aes(x=as.factor(diversity), y=height_cm, color=as.factor(warming))) +
-#   geom_boxplot() +
-#   geom_point() +
-#   scale_color_manual(values=c('#0072B2', '#D55E00'),
-#                      breaks=c(0,1),
-#                      labels=c('Control', 'Drought')) +
-#   xlab('Rhizobial Diversity') + ylab('Height (cm)') +
-#   theme(axis.title.y=element_text(vjust=1)) +
-#   facet_wrap(~date, scales='free') +
-#   theme(strip.text.x = element_text(size=20),
-#         strip.background = element_rect(colour="black", fill="white"),
-#         panel.spacing = unit(2, "lines"))
-# #export at 1200 x 600
+#avg over doy
+ggplot(data=barGraphStats(data=subset(growthData, diversity!=0), variable="height_cm", byFactorNames=c("warming", "diversity")), aes(x=diversity, y=mean, color=as.factor(warming))) +
+  geom_point(size=5) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2) +
+  # scale_color_manual(values=c('#0072B2', '#D55E00'),
+  # breaks=c(0,1),
+  # labels=c('Control', 'Drought')) +
+  xlab('Rhizobial Diversity') + ylab('Height (cm)') +
+  theme(axis.title.y=element_text(vjust=1)) +
+  theme(strip.text.x = element_text(size=20),
+        strip.background = element_rect(colour="black", fill="white"),
+        panel.spacing = unit(2, "lines"))
+#export at 1200 x 600
+
+#choose two time points
+ggplot(data=subset(growthData, doy %in% c(192,253) & diversity!=0), aes(x=as.factor(diversity), y=height_cm, color=as.factor(warming))) +
+  geom_boxplot() +
+  geom_point() +
+  scale_color_manual(values=c('#0072B2', '#D55E00'),
+                     breaks=c(0,1),
+                     labels=c('Control', 'Drought')) +
+  xlab('Rhizobial Diversity') + ylab('Height (cm)') +
+  theme(axis.title.y=element_text(vjust=1)) +
+  facet_wrap(~date, scales='free') +
+  theme(strip.text.x = element_text(size=20),
+        strip.background = element_rect(colour="black", fill="white"),
+        panel.spacing = unit(2, "lines"))
+#export at 1200 x 600
 
 
-# ggplot(data=barGraphStats(data=subset(growthRelative, date %in% c('7/27/2018', '8/23/2018') & !is.na(height_rel)), variable="height_rel", byFactorNames=c("date", "warming", "diversity")), aes(x=as.factor(warming), y=mean, fill=as.factor(diversity))) + 
-#   geom_bar(stat='identity', position=position_dodge()) +
-#   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
-#   facet_wrap(~date, scales='free')
+##growth rate (cm/day)---------
+#data check
+ggplot(data=growthRate, aes(x=rate_period, y=growth_rate)) +
+  geom_point() +
+  facet_wrap(~plant)
+
+summary(growthModel <- lmer(growth_rate~diversity*warming + (1|bed/plant), data=subset(growthRate, rate_period!='rate_3'))) #no effects
+check_model(growthModel)
 
 
 ###leaf number---------
-summary(lmer(num_leaves~diversity*warming + (1|date), data=growthData)) #no effect
-summary(glm(num_leaves~diversity*warming, data=subset(growthData, date=='7/27/2018'&diversity!=0))) #no effect
-summary(glm(num_leaves~diversity, data=subset(growthData, date=='7/27/2018'&warming==0))) #no effect
-summary(glm(num_leaves~diversity, data=subset(growthData, date=='7/27/2018'&warming==1))) #no effect
-summary(glm(num_leaves~diversity*warming, data=subset(growthData, date=='8/23/2018'&diversity!=0))) #no effect
+#data check
+ggplot(data=growthData, aes(x=doy, y=num_leaves)) +
+  geom_point() +
+  facet_wrap(~plant)
+
+#model
+summary(leafModel <- lmer(log(num_leaves)~diversity*warming + (1|bed/plant), data=subset(growthData, doy!=200 & num_leaves>0))) #no effect
+check_model(leafModel)
+
 
 
 ###insect herbivory---------
-summary(lmer(avg_perc_herbivory~diversity*warming + (1|date), data=herbivoryData)) #marginally significant interaction
-summary(glm(avg_perc_herbivory~diversity*warming, data=subset(herbivoryData, date=='7/11/2018'))) #no effect
-summary(glm(avg_perc_herbivory~diversity, data=subset(herbivoryData, date=='7/11/2018'&warming==0))) #no effect 
-summary(glm(avg_perc_herbivory~diversity, data=subset(herbivoryData, date=='7/11/2018'&warming==1))) #no effect
-summary(glm(avg_perc_herbivory~diversity*warming, data=subset(herbivoryData, date=='8/9/2018'))) #no effect
+#data check
+ggplot(data=subset(herbivoryData, doy!=200), aes(x=doy, y=avg_perc_herbivory)) +
+  geom_point() +
+  facet_wrap(~plant)
+
+###START HERE: need to figure out how to do repeated measures in R
+#model
+summary(insectherbModel <- lmer(sqrt(avg_perc_herbivory)~diversity*warming + (1|bed), data=subset(herbivoryData, doy!=200 & diversity>0))) #no effect (neither for pre rabbit, post rabbit, or any certain date)
+check_model(insectherbModel)
+
+#nlme option
+library(nlme)
+library(car)
+correlation = Structure(form  = ~ time | subjvar)
+
+model = lme(sqrt(avg_perc_herbivory) ~ diversity*warming*doy,
+            random = ~1|bed/plant,
+            correlation = corAR1(),
+            data=subset(herbivoryData, doy!=200 & diversity>0),
+            method="REML")
+Anova(model)
 
 
-ggplot(data=barGraphStats(data=subset(herbivoryData, date %in% c('7/27/2018', '8/9/2018')), variable="avg_perc_herbivory", byFactorNames=c("date", "warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) +
+
+ggplot(data=barGraphStats(data=subset(herbivoryData, doy!=200 & diversity>0), variable="avg_perc_herbivory", byFactorNames=c("doy", "warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) +
   geom_point(size=5, position=position_dodge(width=0.25)) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
   scale_color_manual(values=c('#0072B2', '#D55E00'),
@@ -165,11 +233,12 @@ ggplot(data=barGraphStats(data=subset(herbivoryData, date %in% c('7/27/2018', '8
                      labels=c('Control', 'Drought')) +
   xlab('Rhizobial Diversity') + ylab('Invertebrate Herbivory (%)') +
   theme(axis.title.y=element_text(vjust=1)) +
-  facet_wrap(~date, scales='free') +
+  facet_wrap(~doy, scales='free') +
   theme(strip.text.x = element_text(size=20),
         strip.background = element_rect(colour="black", fill="white"),
         panel.spacing = unit(2, "lines"))
 #export at 665 x 610
+
 
 
 ###rabbit herbivory---------
