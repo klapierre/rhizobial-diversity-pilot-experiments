@@ -55,12 +55,13 @@ trt <- read.csv('soy pilot_2018_common garden_treatments.csv')
 growthData <- read.csv('soy pilot_2018_common garden_growth.csv')%>%
   left_join(trt)%>%
   select(-num_flowers, -num_pods)%>%
+  mutate(bed=as.factor(bed), plant=as.factor(plant), warming=as.factor(warming))%>%
   filter(height_cm<9000, num_leaves<9000)%>%
   filter(plant %!in% c(635,900,1062,1073,2557))%>% #drop plants that died
   rename(num_leaflets=num_leaves)%>% #leaflets were counted, divide by 3 to get num leaves
   mutate(num_leaves=num_leaflets/3)%>%
   select(-num_rabbit_herb)%>% #drop num_rabbit_herb, which is number of stems removed by rabbit (counted as clipped stems, which is not very accurate if the rabbit clipped a branch with many higher stems); will calculate num leaves removed by rabbit later on
-  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=strftime(date2, format = "%j"))
+  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=as.numeric(strftime(date2, format = "%j")))
 
 growthRate <- growthData%>%
   mutate(doy_cat=paste('doy', doy, sep='_'))%>%
@@ -115,7 +116,8 @@ ggplot(data=growthData, aes(x=doy, y=height_cm)) +
   facet_wrap(~plant)
 
 #model
-summary(heightModel <- lmer(log(height_cm)~diversity*warming + (1|bed/plant), data=subset(growthData, doy!=200))) #no effects (similarly no effects for either before or after rabbit event time series)
+summary(heightModel <- lmer(log(height_cm)~diversity*warming + (1|bed), data=subset(growthData, doy==200))) #no effects (similarly no effects for either before or after rabbit event time series)
+anova(heightModel)
 check_model(heightModel)
 
 #facet by doy
