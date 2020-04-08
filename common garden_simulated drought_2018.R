@@ -7,6 +7,7 @@
 
 library(lme4)
 library(lmerTest)
+library(ggeffects)
 library(grid)
 library(performance)
 library(tidyverse)
@@ -50,18 +51,20 @@ barGraphStats <- function(data, variable, byFactorNames) {
 ###########################################################################
 
 ###read in data
-trt <- read.csv('soy pilot_2018_common garden_treatments.csv')
+trt <- read.csv('soy pilot_2018_common garden_treatments.csv')%>%
+  mutate(bed=as.factor(bed), plant=as.factor(plant), warming=as.factor(warming))
   
 growthData <- read.csv('soy pilot_2018_common garden_growth.csv')%>%
+  mutate(bed=as.factor(bed), plant=as.factor(plant), warming=as.factor(warming))%>%
   left_join(trt)%>%
   select(-num_flowers, -num_pods)%>%
-  mutate(bed=as.factor(bed), plant=as.factor(plant), warming=as.factor(warming))%>%
   filter(height_cm<9000, num_leaves<9000)%>%
   filter(plant %!in% c(635,900,1062,1073,2557))%>% #drop plants that died
   rename(num_leaflets=num_leaves)%>% #leaflets were counted, divide by 3 to get num leaves
   mutate(num_leaves=num_leaflets/3)%>%
   select(-num_rabbit_herb)%>% #drop num_rabbit_herb, which is number of stems removed by rabbit (counted as clipped stems, which is not very accurate if the rabbit clipped a branch with many higher stems); will calculate num leaves removed by rabbit later on
-  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=as.numeric(strftime(date2, format = "%j")))
+  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=as.numeric(strftime(date2, format = "%j")), doe=(doy-169))%>% #gets day of year (doy) and day of experiment (doe)
+  mutate(height_scaled=(height_cm-mean(height_cm))/sd(height_cm))
 
 growthRate <- growthData%>%
   mutate(doy_cat=paste('doy', doy, sep='_'))%>%
@@ -72,6 +75,7 @@ growthRate <- growthData%>%
   gather(key=rate_period, value=growth_rate, rate_1:rate_8)
 
 herbivoryData <- read.csv('soy pilot_2018_common garden_herbivory.csv')%>%
+  mutate(bed=as.factor(bed), plant=as.factor(plant), warming=as.factor(warming))%>%
   filter(perc_herbivory<9000)%>%
   filter(plant %!in% c(635,900,1062,1073,2557))%>% #drop plants that died
   #calculate avg chewing insect herbivory per leaf
@@ -81,59 +85,80 @@ herbivoryData <- read.csv('soy pilot_2018_common garden_herbivory.csv')%>%
   left_join(growthData)%>%
   mutate(avg_perc_herbivory=sum_perc_herbivory/num_leaflets)%>%
   filter(!is.na(avg_perc_herbivory), avg_perc_herbivory<100000)%>%
-  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=strftime(date2, format = "%j"))
+  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=as.numeric(strftime(date2, format = "%j")), doe=(doy-169))
 
 insectData <- read.csv('soy pilot_2018_common garden_insects.csv')%>%
+  mutate(bed=as.factor(bed), plant=as.factor(plant), warming=as.factor(warming))%>%
   left_join(trt)%>%
   filter(Aphids<9000)%>%
   filter(plant %!in% c(635,900,1062,1073,2557))%>% #drop plants that died
-  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=strftime(date2, format = "%j"))
+  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=as.numeric(strftime(date2, format = "%j")), doe=(doy-169))
 
 flowerData <- read.csv('soy pilot_2018_common garden_growth.csv')%>%
+  mutate(bed=as.factor(bed), plant=as.factor(plant), warming=as.factor(warming))%>%
   left_join(trt)%>%
   select(-height_cm, -num_leaves)%>%
   filter(num_flowers<9000, num_pods<9000)%>%
   filter(plant %!in% c(635,900,1062,1073,2557))%>% #drop plants that died
-  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=strftime(date2, format = "%j"))
+  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=as.numeric(strftime(date2, format = "%j")), doe=(doy-169))
+
+weightData <- read.csv('soy pilot_2018_common garden_bean weight.csv')%>%
+  mutate(bed=as.factor(bed), plant=as.factor(plant), warming=as.factor(warming))
 
 fitnessData <- read.csv('soy pilot_2018_common garden_pods.csv')%>%
   select(-comments)%>%
-  left_join(read.csv('soy pilot_2018_common garden_bean weight.csv'))%>%
+  mutate(bed=as.factor(bed), plant=as.factor(plant), warming=as.factor(warming))%>%
+  left_join(weightData)%>%
   select(-notes)%>%
   left_join(trt)%>%
   filter(total_pods<9000)%>%
   filter(aborted_pods<9000)%>%
   filter(plant %!in% c(635,900,1062,1073,2557))%>% #drop plants that died
   mutate(viable_pods=total_pods-aborted_pods)%>%
-  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=strftime(date2, format = "%j"))
+  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=as.numeric(strftime(date2, format = "%j")), doe=(doy-169))
 
 
 ###height--------- for all growth analyses, don't use doy=200, which is the measurement immediately following rabbit herbivory
 ##height absolute
 #data check
-ggplot(data=growthData, aes(x=doy, y=height_cm)) +
+ggplot(data=growthData, aes(x=doe, y=height_cm)) +
   geom_point() +
   facet_wrap(~plant)
+hist(log10(growthData$height_cm))
 
-#model
-summary(heightModel <- lmer(log(height_cm)~diversity*warming + (1|bed), data=subset(growthData, doy==200))) #no effects (similarly no effects for either before or after rabbit event time series)
+#model -- repeated measures to examine the effects of treatments on growth rate (slope of height through time, fixed intercept)
+summary(heightModel <- lmer(log10(height_cm)~diversity*warming + doe + (doe-1|bed), data=subset(growthData, doy!=200 & height_cm>3)))
 anova(heightModel)
 check_model(heightModel)
+###problem: this should allow for random slopes and fixed intercepts, but the plots all still show random intercepts and fixed slopes. Gah! 
 
-#facet by doy
-ggplot(data=barGraphStats(data=growthData, variable="height_cm", byFactorNames=c("doy", "warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) +
-    geom_point(size=5) +
-    geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2) +
-    scale_color_manual(values=c('#0072B2', '#D55E00'),
-                       breaks=c(0,1),
-                       labels=c('Control', 'Drought')) +
-    xlab('Rhizobial Diversity') + ylab('Height (cm)') +
-    theme(axis.title.y=element_text(vjust=1)) +
-    facet_wrap(~doy, scales='free') +
-    theme(strip.text.x = element_text(size=20),
-          strip.background = element_rect(colour="black", fill="white"),
-          panel.spacing = unit(2, "lines"))
+ggpredict(heightModel, terms = c("doe", "warming"), type = "re") %>% 
+  plot() 
+
+#diversity effect
+heightModelDiversity <- ggpredict(heightModel, terms = c("doe", "diversity"))%>% # this gives overall predictions for the model
+  rename(doe=x, diversity=group)
+
+heightDiversityPlot <- ggplot(data=subset(growthData, doy!=200), aes(x=doe, y=height_cm, color=as.factor(diversity))) +
+  geom_point() +
+  geom_line(data=heightModelDiversity, aes(x=doe, y=10^(predicted), color=as.factor(diversity)), size=3) +
+  scale_color_manual(values=c('#ffc425', '#f37735', '#00b159', '#00aedb'), breaks=c(0,1,2,3), labels=c('uninoc.', '1 strain', '2 strains', '3 strains')) +
+  xlab('Day of Experiment') + ylab('Height (cm)') +
+  scale_y_continuous(trans='log10')
+
+
+#warming effect
+heightModelWarming <- ggpredict(heightModel, terms = c("doe", "warming"), type='re')%>% # this gives overall predictions for the model
+  rename(doe=x, warming=group)
+
+heightWarmingPlot <- ggplot(data=subset(growthData, doy!=200), aes(x=doe, y=height_cm, color=as.factor(warming))) +
+  geom_point() +
+  geom_line(data=heightModelWarming, aes(x=doe, y=10^(predicted), color=as.factor(warming)), size=3) +
+  scale_color_manual(values=c('#666666', '#cc0000'), breaks=c(0,1), labels=c('ambient', 'warmed')) +
+  xlab('Day of Experiment') + ylab('Height (cm)') +
+  scale_y_continuous(trans='log10')
 #export at 1200 x 600
+
 
 #facet by warming
 ggplot(data=barGraphStats(data=subset(growthData, diversity!=0), variable="height_cm", byFactorNames=c("doy", "warming", "diversity")), aes(x=doy, y=mean, color=as.factor(diversity))) +
