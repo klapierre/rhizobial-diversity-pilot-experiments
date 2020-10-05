@@ -8,6 +8,7 @@
 library(lme4)
 library(lmerTest)
 library(ggeffects)
+library(sjPlot)
 library(grid)
 library(performance)
 library(tidyverse)
@@ -127,24 +128,32 @@ ggplot(data=growthData, aes(x=doe, y=height_cm)) +
 hist(log10(growthData$height_cm))
 
 #model -- repeated measures to examine the effects of treatments on growth rate (slope of height through time, fixed intercept)
-summary(heightModel <- lmer(log10(height_cm)~diversity*warming + doe + (doe-1|bed), data=subset(growthData, doy!=200 & height_cm>3)))
+summary(heightModel <- lmer(log10(height_cm)~diversity*warming + doe + (doe|bed), data=subset(growthData, doy!=200)))
 anova(heightModel)
 check_model(heightModel)
-###problem: this should allow for random slopes and fixed intercepts, but the plots all still show random intercepts and fixed slopes. Gah! 
 
-ggpredict(heightModel, terms = c("doe", "warming"), type = "re") %>% 
-  plot() 
+# #not repeated measures - test
+# summary(heightModel2 <- lmer(log10(height_cm)~diversity*warming +(1|bed), data=subset(growthData, doe==84)))
+# anova(heightModel2)
+# 
+# plot_model(heightModel2, type='pred', terms = c("diversity", "warming"))
 
 #diversity effect
-heightModelDiversity <- ggpredict(heightModel, terms = c("doe", "diversity"))%>% # this gives overall predictions for the model
-  rename(doe=x, diversity=group)
+heightModelDiversity <- ggpredict(heightModel, terms = c("doe", "bed", "diversity"))%>% # this gives overall predictions for the model
+  rename(doe=x, bed=group, diversity=facet)
 
+#why don't the lines have non-parallel slopes!?
 heightDiversityPlot <- ggplot(data=subset(growthData, doy!=200), aes(x=doe, y=height_cm, color=as.factor(diversity))) +
   geom_point() +
-  geom_line(data=heightModelDiversity, aes(x=doe, y=10^(predicted), color=as.factor(diversity)), size=3) +
+  # geom_line(data = cbind(growthData, pred = predict(heightModel)), aes(y = pred), size = 1) + 
+  geom_smooth(data=heightModelDiversity, aes(x=doe, y=10^(predicted), group=as.factor(bed), color=as.factor(diversity)), size=3, method='lm', se=F) +
   scale_color_manual(values=c('#ffc425', '#f37735', '#00b159', '#00aedb'), breaks=c(0,1,2,3), labels=c('uninoc.', '1 strain', '2 strains', '3 strains')) +
   xlab('Day of Experiment') + ylab('Height (cm)') +
   scale_y_continuous(trans='log10')
+
+ggplot(data=heightModelDiversity, aes(x=doe, y=10^predicted)) +
+  geom_point()
+  geom_smooth(method='lm', se=F)
 
 
 #warming effect
@@ -157,51 +166,6 @@ heightWarmingPlot <- ggplot(data=subset(growthData, doy!=200), aes(x=doe, y=heig
   scale_color_manual(values=c('#666666', '#cc0000'), breaks=c(0,1), labels=c('ambient', 'warmed')) +
   xlab('Day of Experiment') + ylab('Height (cm)') +
   scale_y_continuous(trans='log10')
-#export at 1200 x 600
-
-
-#facet by warming
-ggplot(data=barGraphStats(data=subset(growthData, diversity!=0), variable="height_cm", byFactorNames=c("doy", "warming", "diversity")), aes(x=doy, y=mean, color=as.factor(diversity))) +
-  geom_point(size=5) +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2) +
-  # scale_color_manual(values=c('#0072B2', '#D55E00'),
-                     # breaks=c(0,1),
-                     # labels=c('Control', 'Drought')) +
-  xlab('Day of Year') + ylab('Height (cm)') +
-  theme(axis.title.y=element_text(vjust=1)) +
-  facet_wrap(~warming) +
-  theme(strip.text.x = element_text(size=20),
-        strip.background = element_rect(colour="black", fill="white"),
-        panel.spacing = unit(2, "lines"))
-#export at 1200 x 600
-
-#avg over doy
-ggplot(data=barGraphStats(data=subset(growthData, diversity!=0), variable="height_cm", byFactorNames=c("warming", "diversity")), aes(x=diversity, y=mean, color=as.factor(warming))) +
-  geom_point(size=5) +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2) +
-  # scale_color_manual(values=c('#0072B2', '#D55E00'),
-  # breaks=c(0,1),
-  # labels=c('Control', 'Drought')) +
-  xlab('Rhizobial Diversity') + ylab('Height (cm)') +
-  theme(axis.title.y=element_text(vjust=1)) +
-  theme(strip.text.x = element_text(size=20),
-        strip.background = element_rect(colour="black", fill="white"),
-        panel.spacing = unit(2, "lines"))
-#export at 1200 x 600
-
-#choose two time points
-ggplot(data=subset(growthData, doy %in% c(192,253) & diversity!=0), aes(x=as.factor(diversity), y=height_cm, color=as.factor(warming))) +
-  geom_boxplot() +
-  geom_point() +
-  scale_color_manual(values=c('#0072B2', '#D55E00'),
-                     breaks=c(0,1),
-                     labels=c('Control', 'Drought')) +
-  xlab('Rhizobial Diversity') + ylab('Height (cm)') +
-  theme(axis.title.y=element_text(vjust=1)) +
-  facet_wrap(~date, scales='free') +
-  theme(strip.text.x = element_text(size=20),
-        strip.background = element_rect(colour="black", fill="white"),
-        panel.spacing = unit(2, "lines"))
 #export at 1200 x 600
 
 
@@ -233,22 +197,22 @@ ggplot(data=subset(herbivoryData, doy!=200), aes(x=doy, y=avg_perc_herbivory)) +
   geom_point() +
   facet_wrap(~plant)
 
-###START HERE: need to figure out how to do repeated measures in R
 #model
-summary(insectherbModel <- lmer(sqrt(avg_perc_herbivory)~diversity*warming + (1|bed), data=subset(herbivoryData, doy!=200 & diversity>0))) #no effect (neither for pre rabbit, post rabbit, or any certain date)
+summary(insectherbModel <- lmer(sqrt(avg_perc_herbivory)~diversity*warming +doe + (doe|bed), data=subset(herbivoryData, doy!=200)))
+anova(insectherbModel) #no effect (neither for pre rabbit, post rabbit, or any certain date)
 check_model(insectherbModel)
 
-#nlme option
-library(nlme)
-library(car)
-correlation = Structure(form  = ~ time | subjvar)
-
-model = lme(sqrt(avg_perc_herbivory) ~ diversity*warming*doy,
-            random = ~1|bed/plant,
-            correlation = corAR1(),
-            data=subset(herbivoryData, doy!=200 & diversity>0),
-            method="REML")
-Anova(model)
+# #nlme option
+# library(nlme)
+# library(car)
+# correlation = Structure(form  = ~ time | subjvar)
+# 
+# model = lme(sqrt(avg_perc_herbivory) ~ diversity*warming*doy,
+#             random = ~1|bed/plant,
+#             correlation = corAR1(),
+#             data=subset(herbivoryData, doy!=200 & diversity>0),
+#             method="REML")
+# Anova(model)
 
 
 
