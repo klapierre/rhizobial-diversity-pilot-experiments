@@ -7,11 +7,13 @@
 
 library(nlme)
 library(lsmeans)
-library(ggeffects)
-library(sjPlot)
-library(grid)
+# library(ggeffects)
+# library(sjPlot)
+# library(grid)
 library(performance)
+library(piecewiseSEM)
 library(tidyverse)
+library(ggpubr)
 
 #laptop
 setwd('C:\\Users\\lapie\\Dropbox (Smithsonian)\\SERC\\interns\\2018\\2018_REU_Esch\\final data_komatsu approved')
@@ -81,7 +83,7 @@ herbivoryData <- read.csv('soy pilot_2018_common garden_herbivory.csv')%>%
   filter(plant %!in% c(635,900,1062,1073,2557))%>% #drop plants that died
   #calculate avg chewing insect herbivory per leaf
   group_by(bed, plant, date)%>%
-  summarise(sum_perc_herbivory=sum(perc_herbivory), mean_perc_herbivory=mean(perc_herbivory))%>%
+  summarise(sum_perc_herbivory=sum(perc_herbivory))%>%
   ungroup()%>%
   left_join(growthData)%>%
   mutate(avg_perc_herbivory=sum_perc_herbivory/num_leaflets)%>%
@@ -133,8 +135,8 @@ summary(heightModel <- lme(log10(height_cm)~as.factor(diversity)*as.factor(warmi
                            random=~1|bed,
                            correlation=corAR1(form=~doe|bed/plant),
                            control=lmeControl(returnObject=T)))
-anova(heightModel) #significant effects of warming and day of expt
 check_model(heightModel)
+anova(heightModel) #significant effects of warming and day of expt
 
 
 #height figure
@@ -178,8 +180,8 @@ summary(leafModel <- lme(log10(num_leaves)~as.factor(diversity)*as.factor(warmin
                          random=~1|bed, 
                          correlation=corAR1(form=~doe|bed/plant),
                          control=lmeControl(returnObject=T)))
-anova(leafModel) #significant interaction between warming and day of expt
 check_model(leafModel)
+anova(leafModel) #significant interaction between warming and day of expt
 
 #leaf num figure
 ggplot(barGraphStats(data=subset(growthData, doy!=200&diversity!=0&num_leaves>0), variable="num_leaves", byFactorNames=c("doe", "warming")), aes(x=doe, y=mean, color=as.factor(warming))) +
@@ -218,9 +220,35 @@ insectFig <- ggplot(data=barGraphStats(data=subset(herbivoryData, doy!=200 & div
   annotate('text', x=1, y=3, label='a', size=8) +
   annotate('text', x=2, y=2.7, label='ab', size=8) +
   annotate('text', x=3, y=2.4, label='b', size=8) +
-  annotate('text', x=0.5, y=3, label='(a)', size=8)
+  annotate('text', x=0.5, y=3, label='(b)', size=8)
 #export at 800 x 800
 
+###aphid number---------
+summary(aphidModel <- lme(Aphids~as.factor(diversity)*as.factor(warming), data=subset(insectData, Aphids<9000&diversity!=0), random=~1|bed))
+anova(aphidModel) #warming and diversity interaction
+lsmeans(aphidModel, pairwise~as.factor(diversity)*as.factor(warming), adjust="tukey")
+
+summary(glm(Aphids~diversity, data=subset(insectData, Aphids<9000&warming==0))) #no effect
+summary(glm(Aphids~diversity, data=subset(insectData, Aphids<9000&warming==1))) #diversity effect
+
+aphidFig <- ggplot(data=barGraphStats(data=subset(insectData, Aphids<9000&diversity!=0), variable="Aphids", byFactorNames=c("warming", "diversity")), aes(x=as.factor(diversity), y=mean, fill=as.factor(warming))) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.9), width=0.2) +
+  scale_fill_manual(values=c('#666666', '#cc0000'),
+                    breaks=c(0,1),
+                    labels=c('control', 'drought'),
+                    name='Drought\nTreatment') +
+  xlab('') + ylab('Aphid Number') +
+  theme(axis.title.y=element_text(vjust=1), legend.position=c(0.98,0.98), legend.justification=c(1,1), 
+        axis.title.x=element_blank(), axis.text.x=element_blank()) +
+  annotate('text', x=0.76, y=220,label='a', size=8) +
+  annotate('text', x=1.24, y=1000,label='b', size=8) +
+  annotate('text', x=1.76, y=150,label='a', size=8) +
+  annotate('text', x=2.24, y=580,label='ab', size=8) +
+  annotate('text', x=2.76, y=180,label='a', size=8) +
+  annotate('text', x=3.24, y=450,label='a', size=8) +
+  annotate('text', x=0.5, y=1000, label='(a)', size=8)
+#export at 800x800
 
 ###rabbit herbivory---------
 leavesPreRabbit <- growthData%>%
@@ -230,14 +258,16 @@ leavesPreRabbit <- growthData%>%
 rabbitData <- growthData%>%
   filter(date=='7/19/2018')%>%
   left_join(leavesPreRabbit)%>%
-  mutate(percent_rabbit_herb=(num_leaves_pre-num_leaves)/num_leaves_pre*100)
+  mutate(percent_rabbit_removed=(num_leaves_pre-num_leaves)/num_leaves_pre*100)%>% #calculates percent of leaves removed by rabbit
+  mutate(percent_rabbit_herb=ifelse(percent_rabbit_removed<0, 0, percent_rabbit_removed)) #sets any plant that increased in leaf number after rabbit herbivory to 0 percent removed
+  
 
 summary(rabbitModel <- lme(percent_rabbit_herb~as.factor(diversity)*as.factor(warming),
             data=subset(rabbitData, diversity!=0),
             random=~1|bed))
 anova(rabbitModel) #no effect
 
-summary(lme(percent_rabbit_herb~diversity, data=subset(rabbitData, warming==0), random=~1|bed)) #marginally sig diversity 
+summary(lme(percent_rabbit_herb~diversity, data=subset(rabbitData, warming==0), random=~1|bed)) #no effect 
 summary(lme(percent_rabbit_herb~diversity, data=subset(rabbitData, warming==1), random=~1|bed)) #no effect
 
 rabbitFig <- ggplot(data=barGraphStats(data=subset(rabbitData, date=='7/19/2018'&diversity!=0), variable="percent_rabbit_herb", byFactorNames=c("diversity")), aes(x=as.factor(diversity), y=mean)) +
@@ -245,20 +275,18 @@ rabbitFig <- ggplot(data=barGraphStats(data=subset(rabbitData, date=='7/19/2018'
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(0.9), width=0.2) +
   scale_x_discrete(breaks=c(1,2,3), labels=c("1 strain", "2 strains", "3 strains")) +
   xlab('Rhizobial Diversity') + ylab('Rabbit Damage') +
-  annotate('text', x=0.5, y=45, label='(b)', size=8)
+  annotate('text', x=0.5, y=45, label='(c)', size=8)
 #export at 800 x 800
 
 #herbivory figure
-pushViewport(viewport(layout=grid.layout(2,1)))
-print(insectFig, vp=viewport(layout.pos.row=1, layout.pos.col=1))
-print(rabbitFig, vp=viewport(layout.pos.row=2, layout.pos.col=1))
-#export at 800x1200
+ggarrange(aphidFig, insectFig, rabbitFig,
+          ncol = 1, nrow = 3)
+#export at 800x1800
 
 
 
 ###flower number---------
 summary(flowerModel <- lme(num_flowers~as.factor(diversity)*as.factor(warming), data=subset(flowerData, num_flowers<9000&date=='8/23/2018'&diversity!=0), random=~1|bed))
-
 anova(flowerModel) #warming effect
 
 flowerFig <- ggplot(data=barGraphStats(data=subset(flowerData, date=='8/23/2018'&diversity!=0), variable="num_flowers", byFactorNames=c("warming")), aes(x=as.factor(warming), y=mean)) +
@@ -361,7 +389,8 @@ abortedFig <- ggplot(data=barGraphStats(data=subset(fitnessData, aborted_pods<90
 
 
 #total beans
-summary(glm(total_beans~diversity*warming, data=subset(fitnessData, total_beans<9000&diversity!=0))) #no effect
+summary(totalBeanModel <- lme(total_beans~diversity*warming, random=~1|bed, data=subset(fitnessData, total_beans<9000&diversity!=0))) #no effect
+anova(totalBeanModel)
 summary(glm(total_beans~diversity, data=subset(fitnessData, total_beans<9000&warming==0))) #no effect
 summary(glm(total_beans~diversity, data=subset(fitnessData, total_beans<9000&warming==1))) #no effect
 
@@ -454,41 +483,145 @@ weightFig <- ggplot(data=barGraphStats(data=subset(fitnessData, bean_weight_g<90
 
 
 #flowers, pods, and weight
-pushViewport(viewport(layout=grid.layout(2,2)))
-print(flowerFig2, vp=viewport(layout.pos.row=1, layout.pos.col=1))
-print(abortedFig, vp=viewport(layout.pos.row=1, layout.pos.col=2))
-print(viableFig, vp=viewport(layout.pos.row=2, layout.pos.col=1))
-print(weightFig, vp=viewport(layout.pos.row=2, layout.pos.col=2))
+ggarrange(flowerFig2, abortedFig, viableFig, weightFig,
+          ncol = 2, nrow = 2)
 #export at 1800x1800
 
 
 
-#aphid number
-summary(aphidModel <- lme(Aphids~as.factor(diversity)*as.factor(warming), data=subset(insectData, Aphids<9000&diversity!=0), random=~1|bed))
-anova(aphidModel) #warming and diversity interaction
-lsmeans(aphidModel, pairwise~as.factor(diversity)*as.factor(warming), adjust="tukey")
 
-summary(glm(Aphids~diversity, data=subset(insectData, Aphids<9000&warming==0))) #no effect
-summary(glm(Aphids~diversity, data=subset(insectData, Aphids<9000&warming==1))) #diversity effect
 
-ggplot(data=barGraphStats(data=subset(insectData, Aphids<9000&diversity!=0), variable="Aphids", byFactorNames=c("warming", "diversity")), aes(x=as.factor(warming), y=mean, fill=as.factor(diversity))) +
-  geom_bar(stat='identity', position=position_dodge()) +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.9), width=0.2) +
-  scale_fill_manual(values=c('#f37735', '#00b159', '#00aedb'),
+###regressions between damage and fitness outcomes
+#subset and merge data
+
+#plot by doe to determine what date to select for regressions (data support averaging across all dates)
+# ggplot(data=barGraphStats(data=subset(herbivoryData, diversity!=0&doy!=200), variable="avg_perc_herbivory", byFactorNames=c("warming", "diversity", "doe")), aes(x=as.factor(warming), y=mean, fill=as.factor(diversity))) +
+#   geom_bar(stat='identity', position=position_dodge()) +
+#   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.9), width=0.2) +
+#   facet_wrap(~doe)
+
+herbivoryRegData <- herbivoryData%>%
+  filter(doy!=200)%>%
+  group_by(bed, plant, warming, diversity)%>%
+  summarize(avg_insect_herb=mean(avg_perc_herbivory))%>%
+  ungroup()
+insectRegData <- insectData%>%select(bed, plant, warming, diversity, Aphids)
+rabbitRegData <- rabbitData%>%select(bed, plant, warming, diversity, percent_rabbit_herb)
+fitnessRegData <- fitnessData%>%select(bed, plant, warming, diversity, total_pods, aborted_pods, viable_pods, total_beans, healthy_beans, bean_weight_g)
+regData <- herbivoryRegData%>%left_join(rabbitRegData)%>%left_join(fitnessRegData)%>%left_join(insectRegData)%>%filter(complete.cases(.))%>%filter(diversity!=0)
+
+#are insect and rabbit herbivory correlated?
+summary(lme(percent_rabbit_herb ~ sqrt(avg_insect_herb), data=regData, random=~1|bed)) #no correlation
+summary(lme(percent_rabbit_herb ~ log10(Aphids), data=subset(regData, Aphids>0), random=~1|bed)) #no correlation
+summary(lm(sqrt(avg_insect_herb) ~ log10(Aphids), data=subset(regData, Aphids>0))) #negative correlation
+
+
+#viable pods
+summary(lm(viable_pods ~ sqrt(avg_insect_herb), data=regData)) #significant decrease
+summary(lm(viable_pods ~ log10(Aphids), data=subset(regData, Aphids>0))) #marginally significant increase
+summary(lm(viable_pods ~ percent_rabbit_herb, data=regData)) #significnat decrease
+
+#aborted pods
+summary(lm(aborted_pods ~ sqrt(avg_insect_herb), data=regData)) #no effect
+summary(lm(aborted_pods ~ log10(Aphids), data=subset(regData, Aphids>0))) #marginally significnat decrease
+summary(lm(aborted_pods ~ percent_rabbit_herb, data=regData)) #no effect
+
+#total pods
+summary(lm(total_pods ~ sqrt(avg_insect_herb), data=regData)) #significant decrease
+summary(lm(total_pods ~ log10(Aphids), data=subset(regData, Aphids>0))) #no effect
+summary(lm(total_pods ~ percent_rabbit_herb, data=regData)) #significant decrease
+
+#bean weight
+summary(lm(bean_weight_g ~ sqrt(avg_insect_herb), data=regData)) #no effect
+summary(lm(bean_weight_g ~ log10(Aphids), data=subset(regData, Aphids>0))) #no effect
+summary(lm(bean_weight_g ~ percent_rabbit_herb, data=regData)) #no effect
+
+#healthy bean number
+summary(lm(healthy_beans ~ sqrt(avg_insect_herb), data=regData)) #significant decrease
+summary(lm(healthy_beans ~ log10(Aphids), data=subset(regData, Aphids>0))) #significant increase
+summary(lm(healthy_beans ~ percent_rabbit_herb, data=regData)) #significant decrease
+
+#figure
+aphidBeansFig <- ggplot(data=regData, aes(x=Aphids, y=healthy_beans)) +
+  geom_point(size=3, aes(shape=warming, color=as.factor(diversity))) +
+  xlab('Aphid Number') + ylab('Healthy Bean Number') +
+  scale_color_manual(values=c('#f37735', '#00b159', '#00aedb'),
                     breaks=c(1,2,3),
                     labels=c('1 strain', '2 strains', '3 strains'),
                     name='Rhizobial\nDiversity') +
-  scale_x_discrete(breaks=c(0,1),
-                   labels=c('Control', 'Drought')) +
-  xlab('') + ylab('Aphid Number') +
-  theme(axis.title.y=element_text(vjust=1), legend.position=c(0.02,0.98), legend.justification=c(0,1)) +
-  annotate('text', x=0.7, y=220,label='a', size=8) +
-  annotate('text', x=1, y=150,label='a', size=8) +
-  annotate('text', x=1.3, y=180,label='a', size=8) +
-  annotate('text', x=1.7, y=1000,label='b', size=8) +
-  annotate('text', x=2, y=580,label='a', size=8) +
-  annotate('text', x=2.3, y=450,label='a', size=8)
-#export at 800x800
+  scale_shape_manual(values=c(19,17),
+                     breaks=c(0,1),
+                     labels=c('Control', 'Drought'),
+                     name='Drought\nTreatment') +
+  stat_smooth(method='lm', color='black', se=F) +
+  scale_x_continuous(trans='log10')
+
+insectBeansFig <- ggplot(data=regData, aes(x=avg_insect_herb, y=healthy_beans)) +
+  geom_point(size=3, aes(shape=warming, color=as.factor(diversity))) +
+  xlab('Insect Damage (%)') + ylab('Healthy Bean Number') +
+  scale_color_manual(values=c('#f37735', '#00b159', '#00aedb'),
+                     breaks=c(1,2,3),
+                     labels=c('1 strain', '2 strains', '3 strains'),
+                     name='Rhizobial\nDiversity') +
+  scale_shape_manual(values=c(19,17),
+                     breaks=c(0,1),
+                     labels=c('Control', 'Drought'),
+                     name='Drought\nTreatment') +
+  stat_smooth(method='lm', color='black', se=F) +
+  scale_x_continuous(trans='sqrt')
+
+rabbitBeansFig <- ggplot(data=regData, aes(x=percent_rabbit_herb, y=healthy_beans)) +
+  geom_point(size=3, aes(shape=warming, color=as.factor(diversity))) +
+  xlab('Rabbit Damage (%)') + ylab('Healthy Bean Number') +
+  scale_color_manual(values=c('#f37735', '#00b159', '#00aedb'),
+                     breaks=c(1,2,3),
+                     labels=c('1 strain', '2 strains', '3 strains'),
+                     name='Rhizobial\nDiversity') +
+  scale_shape_manual(values=c(19,17),
+                     breaks=c(0,1),
+                     labels=c('Control', 'Drought'),
+                     name='Drought\nTreatment') +
+  stat_smooth(method='lm', color='black', se=F)
+
+#aphid number, insect, and rabbit damage on healthy beans
+ggarrange(aphidBeansFig, insectBeansFig, rabbitBeansFig,
+          ncol = 3, nrow = 1,
+          common.legend=T, legend='bottom')
+#export at 1800x1800
+  
+
+#total bean number
+summary(lm(total_beans ~ avg_insect_herb, data=regData)) #significant decrease
+summary(lm(total_beans ~ log10(Aphids), data=subset(regData, Aphids>0))) #significant increase
+summary(lm(total_beans ~ percent_rabbit_herb, data=regData)) #significant decrease
+
+
+###SEM! Am I crazy?
+model <- psem(
+  insectherbModel <- lme(sqrt(avg_insect_herb) ~ as.factor(diversity)*as.factor(warming),
+                         data=subset(regData, Aphids>0), 
+                         random=~1|bed),
+  aphidModel <- lme(log10(Aphids) ~ as.factor(diversity)*as.factor(warming), 
+                    data=subset(regData, Aphids>0),
+                    random=~1|bed),
+  rabbitModel <- lme(percent_rabbit_herb ~ as.factor(diversity)*as.factor(warming), 
+                    data=subset(regData, Aphids>0),
+                    random=~1|bed),
+  beanModel <- lme(healthy_beans ~ as.factor(diversity)*as.factor(warming) + sqrt(avg_insect_herb) + log10(Aphids) + percent_rabbit_herb, 
+                     data=subset(regData, Aphids>0),
+                     random=~1|bed)
+
+)
+
+summary(model)
+
+
+
+
+
+
+
+
 
 
 #######
