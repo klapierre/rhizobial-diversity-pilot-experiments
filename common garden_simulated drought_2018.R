@@ -7,6 +7,7 @@
 
 library(nlme)
 library(lsmeans)
+library(car)
 # library(ggeffects)
 # library(sjPlot)
 # library(grid)
@@ -55,7 +56,21 @@ barGraphStats <- function(data, variable, byFactorNames) {
 
 ###read in data
 trt <- read.csv('soy pilot_2018_common garden_treatments.csv')%>%
-  mutate(bed=as.factor(bed), plant=as.factor(plant), warming=as.factor(warming))
+  mutate(bed=as.factor(bed), plant=as.factor(plant), warming=as.factor(warming))%>%
+  mutate(strains_code=ifelse(strains=='1', 'A',
+                             ifelse(strains=='2', 'B',
+                                    ifelse(strains=='3', 'C',
+                                           ifelse(strains=='4', 'D',
+                                                  ifelse(strains=='1,2', 'AB',
+                                                         ifelse(strains=='1,3', 'AC',
+                                                                ifelse(strains=='1,4', 'AD',
+                                                                       ifelse(strains=='2,3', 'BC',
+                                                                              ifelse(strains=='2,4', 'BD',
+                                                                                     ifelse(strains=='3,4', 'CD',
+                                                                                            ifelse(strains=='1,2,3', 'ABC',
+                                                                                                   ifelse(strains=='1,2,4', 'ABD',
+                                                                                                          ifelse(strains=='1,3,4', 'ACD',
+                                                                                                                 ifelse(strains=='2,3,4', 'BCD', 'control')))))))))))))))
   
 growthData <- read.csv('soy pilot_2018_common garden_growth.csv')%>%
   mutate(bed=as.factor(bed), plant=as.factor(plant), warming=as.factor(warming))%>%
@@ -71,7 +86,7 @@ growthData <- read.csv('soy pilot_2018_common garden_growth.csv')%>%
 
 growthRate <- growthData%>%
   mutate(doy_cat=paste('doy', doy, sep='_'))%>%
-  select(doy_cat, bed, warming, plant, treatment_code, strains, diversity, USDA_110, USDA_76, USDA_136, USDA_138, height_cm)%>%
+  select(doy_cat, bed, warming, plant, treatment_code, strains, strains_code, diversity, USDA_110, USDA_76, USDA_136, USDA_138, height_cm)%>%
   spread(key=doy_cat, value=height_cm)%>%
   mutate(rate_1=(doy_186-doy_179)/(186-179), rate_2=(doy_192-doy_186)/(192-186), rate_3=(doy_200-doy_192)/(200-192), rate_4=(doy_208-doy_200)/(208-200), rate_5=(doy_214-doy_208)/(214-208), rate_6=(doy_221-doy_214)/(221-214), rate_7=(doy_235-doy_221)/(235-221), rate_8=(doy_253-doy_235)/(253-235))%>%
   select(bed, warming, plant, treatment_code, strains, diversity, USDA_110, USDA_76, USDA_136, USDA_138, rate_1, rate_2, rate_3, rate_4, rate_5, rate_6, rate_7, rate_8)%>%
@@ -632,143 +647,167 @@ summary(lm(total_beans ~ percent_rabbit_herb, data=regData)) #significant decrea
 
 
 
-
-
-
-
 ####### start here looking at monocultures vs polycultures by updating model structure
 #monocultures-----------
 #insect number
-summary(glm(Aphids~strains*warming, data=subset(insectData, Aphids<9000&diversity==1))) #warming and diversity interaction
+summary(aphidsMonocultureModel <- lme(Aphids~strains_code*warming, data=subset(insectData, Aphids<9000&diversity==1), random=~1|bed)) 
+anova.lme(aphidsMonocultureModel) #warming 
 
-ggplot(data=barGraphStats(data=subset(insectData, Aphids<9000&diversity==1), variable="Aphids", byFactorNames=c("warming", "strains")), aes(x=as.factor(strains), y=mean, color=as.factor(warming))) +
-  geom_point(size=5, position=position_dodge(width=0.25)) +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
-  scale_color_manual(values=c('#0072B2', '#D55E00'),
-                     breaks=c(0,1),
-                     labels=c('Control', 'Drought')) +
+aphidMonoculturePlot <- ggplot(data=barGraphStats(data=subset(insectData, Aphids<9000&diversity==1), variable="Aphids", byFactorNames=c("warming", "strains_code")), aes(x=as.factor(strains_code), y=mean, fill=as.factor(warming))) +
+  geom_bar(size=5, stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.9), width=0.2) +
+  scale_fill_manual(values=c('#666666', '#cc0000'),
+                    breaks=c(0,1),
+                    labels=c('control', 'drought'),
+                    name='Drought\nTreatment') +
   xlab('Rhizobial Strain') + ylab('Aphid Number') +
-  theme(axis.title.y=element_text(vjust=1))
-#export at 665 x 610
+  theme(axis.title.y=element_text(vjust=1), legend.position=c(0.98,0.98), legend.justification=c(1,1), 
+        axis.title.x=element_blank(), axis.text.x=element_blank()) +
+  annotate('text', x=0.76, y=220,label='a', size=8) +
+  annotate('text', x=1.24, y=1200,label='b', size=8) +
+  annotate('text', x=1.76, y=230,label='a', size=8) +
+  annotate('text', x=2.24, y=650,label='b', size=8) +
+  annotate('text', x=2.76, y=520,label='a', size=8) +
+  annotate('text', x=3.24, y=1500,label='b', size=8) +
+  annotate('text', x=3.76, y=180,label='a', size=8) +
+  annotate('text', x=4.24, y=1350,label='b', size=8) +
+  annotate('text', x=0.6, y=1500, label='(a)', size=8)
+#export at 800x800
 
 
 ###insect herbivory---------
-summary(lmer(avg_perc_herbivory~strains*warming + (1|date), data=subset(herbivoryData, diversity==1))) #no effect
-summary(glm(avg_perc_herbivory~strains*warming, data=subset(herbivoryData, date=='7/27/2018'&diversity==1))) #no effect
-summary(glm(avg_perc_herbivory~strains, data=subset(herbivoryData, date=='7/27/2018'&warming==0&diversity==1))) #no effect 
-summary(glm(avg_perc_herbivory~strains, data=subset(herbivoryData, date=='7/27/2018'&warming==1&diversity==1))) #no effect
-summary(glm(avg_perc_herbivory~strains*warming, data=subset(herbivoryData, date=='8/23/2018'&diversity==1))) #no effect
+summary(insectherbModel <- lme(sqrt(avg_perc_herbivory)~as.factor(strains_code)*as.factor(warming)*doe,
+                               data=subset(herbivoryData, doy!=200&diversity==1), 
+                               random=~1|bed, 
+                               correlation=corAR1(form=~doe|bed/plant),
+                               control=lmeControl(returnObject=T)))
+check_model(insectherbModel)
+anova.lme(insectherbModel) #significant effect of strains and time
+lsmeans(insectherbModel, pairwise~as.factor(strains_code), adjust="tukey")
 
-ggplot(data=barGraphStats(data=subset(herbivoryData, date %in% c('7/27/2018', '8/23/2018') & diversity==1), variable="avg_perc_herbivory", byFactorNames=c("date", "warming", "strains")), aes(x=as.factor(strains), y=mean, color=as.factor(warming))) +
-  geom_point(size=5, position=position_dodge(width=0.25)) +
+insectMonoculturePlot <- ggplot(data=barGraphStats(data=subset(herbivoryData, doy!=200&diversity==1), variable="avg_perc_herbivory", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
+  geom_bar(stat='identity', position=position_dodge(width=0.25), fill='white', color='black') +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
-  scale_color_manual(values=c('#0072B2', '#D55E00'),
-                     breaks=c(0,1),
-                     labels=c('Control', 'Drought')) +
+  # scale_color_manual(values=c('#0072B2', '#D55E00'),
+  #                    breaks=c(0,1),
+  #                    labels=c('Control', 'Drought')) +
   xlab('Rhizobial Strain') + ylab('Invertebrate Herbivory (%)') +
-  theme(axis.title.y=element_text(vjust=1)) +
-  facet_wrap(~date, scales='free') +
-  theme(strip.text.x = element_text(size=20),
-        strip.background = element_rect(colour="black", fill="white"),
-        panel.spacing = unit(2, "lines"))
-#export at 665 x 610
+  annotate('text', x=1, y=3.7,label='ab', size=8) +
+  annotate('text', x=2, y=2.8,label='a', size=8) +
+  annotate('text', x=3, y=2.8,label='a', size=8) +
+  annotate('text', x=4, y=4.6,label='b', size=8) +
+  annotate('text', x=0.6, y=4.5, label='(b)', size=8)
+#export at 800 x 800
+
+ggplot(data=barGraphStats(data=subset(herbivoryData, doy!=200&diversity!=0), variable="avg_perc_herbivory", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
+  geom_bar(stat='identity', position=position_dodge(width=0.25), color='black', fill='white') +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
+  xlab('Rhizobial Strain') + ylab('Healthy Bean Number') +
+  theme(axis.title.y=element_text(vjust=1))
+#export at 800x600
 
 
 ###rabbit herbivory---------
-summary(glm(percent_rabbit_herb~strains*warming, data=subset(rabbitData, diversity==1))) #no effect
-summary(glm(percent_rabbit_herb~strains, data=subset(rabbitData, warming==0&diversity==1))) #no effect 
-summary(glm(percent_rabbit_herb~strains, data=subset(rabbitData, warming==1&diversity==1))) #no effect
+summary(rabbitMonocultureModel <- lme(percent_rabbit_herb~strains_code*warming, random=~1|bed,
+                                      data=subset(rabbitData, diversity==1))) 
+anova.lme(rabbitMonocultureModel) #no effect 
 
-ggplot(data=barGraphStats(data=subset(rabbitData, date=='7/19/2018'&diversity==1), variable="percent_rabbit_herb", byFactorNames=c("date", "warming", "strains")), aes(x=as.factor(strains), y=mean, color=as.factor(warming))) +
-  geom_point(size=5, position=position_dodge(width=0.25)) +
+rabbitMonoculturePlot <- ggplot(data=barGraphStats(data=subset(rabbitData, date=='7/19/2018'&diversity==1), variable="percent_rabbit_herb", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
+  geom_bar(position=position_dodge(width=0.25), stat='identity', color='black', fill='white') +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
-  scale_color_manual(values=c('#0072B2', '#D55E00'),
-                     breaks=c(0,1),
-                     labels=c('Control', 'Drought')) +
+  # scale_color_manual(values=c('#0072B2', '#D55E00'),
+  #                    breaks=c(0,1),
+  #                    labels=c('Control', 'Drought')) +
   xlab('Rhizobial Strain') + ylab('Rabbit Herbivory (%)') +
-  theme(axis.title.y=element_text(vjust=1)) +
-  facet_wrap(~date, scales='free') +
-  theme(strip.text.x = element_text(size=20),
-        strip.background = element_rect(colour="black", fill="white"),
-        panel.spacing = unit(2, "lines"))
-#export at 665 x 610
+  annotate('text', x=0.6, y=55, label='(c)', size=8)
+#export at 800 x 800
 
 
-#height absolute
-summary(lmer(height_cm~strains*warming + (1|date), data=subset(growthData, diversity==1))) #warming effect
-summary(glm(height_cm~strains*warming, data=subset(growthData, date=='7/27/2018'&diversity==1))) #early season, strain 4 is different
-summary(glm(height_cm~strains*warming, data=subset(growthData, date=='8/23/2018'&diversity==1))) #end of season, strain 4 is different
-
-ggplot(data=barGraphStats(data=subset(growthData, date %in% c('7/27/2018', '8/23/2018') & diversity==1), variable="height_cm", byFactorNames=c("date", "warming", "strains")), aes(x=as.factor(strains), y=mean, color=as.factor(warming))) +
-  geom_point(size=5) +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2) +
-  scale_color_manual(values=c('#0072B2', '#D55E00'),
-                     breaks=c(0,1),
-                     labels=c('Control', 'Drought')) +
-  xlab('Rhizobial Strain') + ylab('Height (cm)') +
-  theme(axis.title.y=element_text(vjust=1)) +
-  facet_wrap(~date, scales='free') +
-  theme(strip.text.x = element_text(size=20),
-        strip.background = element_rect(colour="black", fill="white"),
-        panel.spacing = unit(2, "lines"))
-#export at 1200 x 600
+#herbivory figure
+ggarrange(aphidMonoculturePlot, insectMonoculturePlot, rabbitMonoculturePlot,
+          ncol = 1, nrow = 3)
+#export at 800x1800
 
 
-#total pods
-summary(glm(total_pods~strains*warming, data=subset(fitnessData, total_pods<9000&diversity==1))) #no effect
 
-ggplot(data=barGraphStats(data=subset(fitnessData, total_pods<9000&diversity==1), variable="total_pods", byFactorNames=c("warming", "strains")), aes(x=as.factor(strains), y=mean, color=as.factor(warming))) +
-  geom_point(size=5, position=position_dodge(width=0.25)) +
+###total pods-----------------------
+summary(beansMonocultureModel <- lme(healthy_beans~strains_code*warming, random=~1|bed,
+                                      data=subset(fitnessData, total_pods<9000&diversity==1))) 
+anova.lme(beansMonocultureModel) #strain
+lsmeans(beansMonocultureModel, pairwise~as.factor(strains_code), adjust="tukey")
+
+ggplot(data=barGraphStats(data=subset(fitnessData, healthy_beans<9000&diversity==1), variable="healthy_beans", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
+  geom_bar(stat='identity', position=position_dodge(width=0.25), color='black', fill='white') +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
-  scale_color_manual(values=c('#0072B2', '#D55E00'),
-                     breaks=c(0,1),
-                     labels=c('Control', 'Drought')) +
-  xlab('Rhizobial Strain') + ylab('Total Pod Number') +
-  theme(axis.title.y=element_text(vjust=1))
-#export at 665 x 610
+    xlab('Rhizobial Strain') + ylab('Healthy Bean Number') +
+  theme(axis.title.y=element_text(vjust=1)) +
+  annotate('text', x=1, y=380,label='a', size=8) +
+  annotate('text', x=2, y=320,label='ab', size=8) +
+  annotate('text', x=3, y=335,label='ab', size=8) +
+  annotate('text', x=4, y=270,label='b', size=8)
+#export at 800x600
+
+
+summary(beansMonocultureModel <- lme(healthy_beans~strains_code*warming, random=~1|bed,
+                                     data=subset(fitnessData, total_pods<9000&diversity!=0))) 
+anova.lme(beansMonocultureModel) #strain
+lsmeans(beansMonocultureModel, pairwise~as.factor(strains_code), adjust="tukey")
+
+ggplot(data=barGraphStats(data=subset(fitnessData, healthy_beans<9000&diversity!=0), variable="healthy_beans", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
+  geom_bar(stat='identity', position=position_dodge(width=0.25), color='black', fill='white') +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
+  xlab('Rhizobial Strain') + ylab('Healthy Bean Number') +
+  theme(axis.title.y=element_text(vjust=1)) +
+  annotate('text', x=1, y=380,label='a', size=8) +
+  annotate('text', x=2, y=320,label='ab', size=8) +
+  annotate('text', x=3, y=335,label='ab', size=8) +
+  annotate('text', x=4, y=270,label='b', size=8)
+#export at 800x600
+
+
 
 
 #######
 #selection vs complementarity-----------
-#insect number
-monoAphids <- insectData%>%
-  filter(diversity==1&Aphids<9000)%>%
-  group_by(warming, strains)%>%
-  summarise(mono_aphid=mean(Aphids))%>%
-  ungroup()%>%
-  mutate(strains2=paste('strain', strains, sep='_'))%>%
-  select(-strains)%>%
-  spread(key=strains2, value=mono_aphid)
-expectedAphids <- insectData%>%
-  left_join(monoAphids)%>%
-  mutate(expected_aphids=(strain_1*USDA_110 + strain_2*USDA_76 + strain_3*USDA_136 + strain_4*USDA_138)/diversity)%>%
-  select(bed, plant, diversity, strains, warming, Aphids, expected_aphids)%>%
-  rename(observed_aphids=Aphids)%>%
-  gather(key='type', value='number', observed_aphids, expected_aphids)
-
-ggplot(data=barGraphStats(data=subset(expectedAphids, number<9000&diversity!=0&warming==1), variable="number", byFactorNames=c("type", "diversity", "strains")), aes(x=as.factor(diversity), y=mean, shape=as.factor(type))) +
-  geom_point(size=5, position=position_dodge(width=0.25), color='#D55E00') +
-  scale_shape_manual(values=c(17, 16),
-                     breaks=c('expected_aphids', 'observed_aphids'),
-                     labels=c('expected', 'observed')) +
-  xlab('Rhizobial Diversity') + ylab('Aphid Number') +
-  theme(axis.title.y=element_text(vjust=1))
-#export at 665 x 610
-
-ggplot(data=barGraphStats(data=subset(expectedAphids, number<9000&diversity!=0&warming==1), variable="number", byFactorNames=c("type", "diversity")), aes(x=as.factor(diversity), y=mean, shape=as.factor(type))) +
-  geom_point(size=5, position=position_dodge(width=0.25), color='#D55E00') +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2, color='#D55E00') +
-  scale_shape_manual(values=c(17, 16),
-                     breaks=c('expected_aphids', 'observed_aphids'),
-                     labels=c('expected', 'observed')) +
-  xlab('Rhizobial Diversity') + ylab('Aphid Number') +
-  theme(axis.title.y=element_text(vjust=1))
-#export at 665 x 610
+# #aphid number
+# monoAphids <- insectData%>%
+#   filter(diversity==1&Aphids<9000)%>%
+#   group_by(warming, strains)%>%
+#   summarise(mono_aphid=mean(Aphids))%>%
+#   ungroup()%>%
+#   mutate(strains2=paste('strain', strains, sep='_'))%>%
+#   select(-strains)%>%
+#   spread(key=strains2, value=mono_aphid)
+# expectedAphids <- insectData%>%
+#   left_join(monoAphids)%>%
+#   mutate(expected_aphids=(strain_1*USDA_110 + strain_2*USDA_76 + strain_3*USDA_136 + strain_4*USDA_138)/diversity)%>%
+#   select(bed, plant, diversity, strains, warming, Aphids, expected_aphids)%>%
+#   rename(observed_aphids=Aphids)%>%
+#   gather(key='type', value='number', observed_aphids, expected_aphids)
+# 
+# ggplot(data=barGraphStats(data=subset(expectedAphids, number<9000&diversity!=0&warming==1), variable="number", byFactorNames=c("type", "diversity", "strains")), aes(x=as.factor(diversity), y=mean, shape=as.factor(type))) +
+#   geom_point(size=5, position=position_dodge(width=0.25), color='#D55E00') +
+#   scale_shape_manual(values=c(17, 16),
+#                      breaks=c('expected_aphids', 'observed_aphids'),
+#                      labels=c('expected', 'observed')) +
+#   xlab('Rhizobial Diversity') + ylab('Aphid Number') +
+#   theme(axis.title.y=element_text(vjust=1))
+# #export at 665 x 610
+# 
+# ggplot(data=barGraphStats(data=subset(expectedAphids, number<9000&diversity!=0&warming==1), variable="number", byFactorNames=c("type", "diversity")), aes(x=as.factor(diversity), y=mean, shape=as.factor(type))) +
+#   geom_point(size=5, position=position_dodge(width=0.25), color='#D55E00') +
+#   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2, color='#D55E00') +
+#   scale_shape_manual(values=c(17, 16),
+#                      breaks=c('expected_aphids', 'observed_aphids'),
+#                      labels=c('expected', 'observed')) +
+#   xlab('Rhizobial Diversity') + ylab('Aphid Number') +
+#   theme(axis.title.y=element_text(vjust=1))
+# #export at 665 x 610
 
 
 ###insect herbivory---------
 monoChew <- herbivoryData%>%
-  filter(diversity==1&date=='7/27/2018')%>%
+  filter(diversity==1&doy!=200)%>%
   group_by(warming, strains)%>%
   summarise(mono_chew=mean(avg_perc_herbivory))%>%
   ungroup()%>%
@@ -776,14 +815,14 @@ monoChew <- herbivoryData%>%
   select(-strains)%>%
   spread(key=strains2, value=mono_chew)
 expectedChew <- herbivoryData%>%
-  filter(date=='7/27/2018')%>%
+  filter(doy!=200)%>%
   left_join(monoChew)%>%
   mutate(expected_chew=(strain_1*USDA_110 + strain_2*USDA_76 + strain_3*USDA_136 + strain_4*USDA_138)/diversity)%>%
-  select(date, bed, plant, diversity, strains, warming, avg_perc_herbivory, expected_chew)%>%
+  select(doy, bed, plant, diversity, strains, warming, avg_perc_herbivory, expected_chew)%>%
   rename(observed_chew=avg_perc_herbivory)%>%
   gather(key='type', value='number', observed_chew, expected_chew)
 
-ggplot(data=barGraphStats(data=subset(expectedChew, date %in% c('7/27/2018') & diversity!=0), variable="number", byFactorNames=c("type", "diversity", "strains")), aes(x=as.factor(diversity), y=mean, shape=as.factor(type))) +
+ggplot(data=barGraphStats(data=subset(expectedChew, doy!=200 & diversity!=0), variable="number", byFactorNames=c("type", "diversity", "strains")), aes(x=as.factor(diversity), y=mean, shape=as.factor(type))) +
   geom_point(size=5, position=position_dodge(width=0.25), color='#D55E00') +
   scale_shape_manual(values=c(17, 16),
                      breaks=c('expected_chew', 'observed_chew'),
@@ -792,7 +831,7 @@ ggplot(data=barGraphStats(data=subset(expectedChew, date %in% c('7/27/2018') & d
   theme(axis.title.y=element_text(vjust=1))
 #export at 665 x 610
 
-ggplot(data=barGraphStats(data=subset(expectedChew, date %in% c('7/27/2018') & diversity!=0), variable="number", byFactorNames=c("type", "diversity")), aes(x=as.factor(diversity), y=mean, shape=as.factor(type))) +
+ggplot(data=barGraphStats(data=subset(expectedChew, doy!=200 & diversity!=0), variable="number", byFactorNames=c("type", "diversity")), aes(x=as.factor(diversity), y=mean, shape=as.factor(type))) +
   geom_point(size=5, position=position_dodge(width=0.25), color='#D55E00') +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2, color='#D55E00') +
   scale_shape_manual(values=c(17, 16),
