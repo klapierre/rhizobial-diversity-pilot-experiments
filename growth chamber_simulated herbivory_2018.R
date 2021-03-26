@@ -73,11 +73,12 @@ nodules <- read.csv('Inside_nodule number.csv')%>%
   left_join(trt)
 biomass <- read.csv('Inside_biomass.csv')%>%
   left_join(trt)%>%
-  mutate(total_biomass=shoot+root)
+  mutate(total_biomass=shoot+root, root_shoot=root/shoot)
 
+###models and figures of height and leaf number through time -- not relevent for tolerance
 ###repeated measures ANOVA for height
 summary(heightModel <- lme(log10(height)~as.factor(diversity_treatment)*as.factor(herbivory)*date,
-                           data=subset(growth, diversity_treatment!=0 & num_leaves!=0), 
+                           data=subset(growth, diversity_treatment!=0 & num_leaves!=0),
                            random=~1|block,
                            correlation=corAR1(form=~date|block/pot),
                            control=lmeControl(returnObject=T)))
@@ -95,7 +96,7 @@ heightPlot <- ggplot(data=barGraphStats(data=subset(growth, diversity_treatment!
 
 ###repeated measures ANOVA for leaf number
 summary(leavesRManova <- lme(log10(num_leaves)~as.factor(diversity_treatment)*as.factor(herbivory)*date,
-                           data=subset(growth, diversity_treatment!=0 & num_leaves!=0), 
+                           data=subset(growth, diversity_treatment!=0 & num_leaves!=0),
                            random=~1|block,
                            correlation=corAR1(form=~date|block/pot),
                            control=lmeControl(returnObject=T)))
@@ -154,6 +155,19 @@ rootPlot <- ggplot(data=barGraphStats(data=subset(biomass, diversity_treatment!=
                     name='Simulated\nHerbivory')
 
 
+summary(rootShootANOVA <- lme(root_shoot~as.factor(diversity_treatment)*as.factor(herbivory),
+                         data=subset(biomass, diversity_treatment!=0), 
+                         random=~1|block))
+anova.lme(rootShootANOVA, type='marginal') #no effect
+
+ggplot(data=barGraphStats(data=subset(biomass, diversity_treatment!=0), variable="root_shoot", byFactorNames=c("diversity_treatment", "herbivory")), aes(x=as.factor(diversity_treatment), y=mean, fill=herbivory)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Rhizobial Diversity') +
+  ylab('Root Biomass (g)') +
+  scale_fill_manual(values=c('dark orange', 'dark green', 'dark blue'),
+                    name='Simulated\nHerbivory')
+
 
 summary(totbioANOVA <- lme(total_biomass~as.factor(diversity_treatment)*as.factor(herbivory),
                          data=subset(biomass, diversity_treatment!=0), 
@@ -174,3 +188,114 @@ ggplot(data=barGraphStats(data=subset(biomass, diversity_treatment!=0), variable
 ggarrange(heightPlot, shootPlot, rootPlot, nodulePlot,
           ncol = 2, nrow = 2)
 #export at 800x1800
+
+
+###calculate tolerance (herbivorized compared to control)
+#growth
+growthControl <- growth%>%
+  filter(herbivory=='none')%>%
+  rename(height_ctl=height)%>%
+  select(block, date, diversity_description, height_ctl)
+
+growthTolerance <- growth%>%
+  filter(herbivory!='none', diversity_description!='control')%>%
+  left_join(growthControl)%>%
+  mutate(lnRR_height=log(height/height_ctl))
+
+summary(heightTolANOVA <- lme(lnRR_height~as.factor(diversity_treatment)*as.factor(herbivory),
+                            data=subset(growthTolerance, diversity_treatment!=0), 
+                            random=~1|block))
+anova.lme(heightTolANOVA, type='marginal') #no effect
+
+#nodules
+nodulesControl <- nodules%>%
+  filter(herbivory=='none')%>%
+  rename(nodules_ctl=nodules)%>%
+  select(block, date, diversity_description, nodules_ctl)
+
+nodulesTolerance <- nodules%>%
+  filter(herbivory!='none', diversity_description!='control')%>%
+  left_join(nodulesControl)%>%
+  mutate(lnRR_nodules=log(nodules/nodules_ctl))%>%
+  mutate(lnRR_nodules=ifelse(lnRR_nodules=='Inf', 2, ifelse(lnRR_nodules=='-Inf', -2, lnRR_nodules)))
+
+summary(noduleTolANOVA <- lme(lnRR_nodules~as.factor(diversity_treatment)*as.factor(herbivory),
+                             data=subset(nodulesTolerance, diversity_treatment!=0&!is.na(lnRR_nodules)
+                                         &lnRR_nodules<2&lnRR_nodules>-2), 
+                             random=~1|block))
+anova.lme(noduleTolANOVA, type='marginal') #marginal diversity treatment effect (but this goes away if the cases with 0 nodules dropped)
+
+#biomass
+biomassControl <- biomass%>%
+  filter(herbivory=='none')%>%
+  rename(shoot_ctl=shoot, root_ctl=root, root_shoot_ctl=root_shoot)%>%
+  select(block, diversity_description, shoot_ctl, root_ctl, root_shoot_ctl)
+
+biomassTolerance <- biomass%>%
+  filter(herbivory!='none', diversity_description!='control')%>%
+  left_join(biomassControl)%>%
+  mutate(lnRR_root=log(root/root_ctl), lnRR_shoot=log(shoot/shoot_ctl), lnRR_root_shoot=log(root_shoot/root_shoot_ctl))
+
+summary(rootTolANOVA <- lme(lnRR_root~as.factor(diversity_treatment)*as.factor(herbivory),
+                         data=subset(biomassTolerance, diversity_treatment!=0), 
+                         random=~1|block))
+anova.lme(rootTolANOVA, type='marginal') #no effect
+
+summary(shootTolANOVA <- lme(lnRR_shoot~as.factor(diversity_treatment)*as.factor(herbivory),
+                            data=subset(biomassTolerance, diversity_treatment!=0), 
+                            random=~1|block))
+anova.lme(shootTolANOVA, type='marginal') #no effect
+
+summary(rootShootTolANOVA <- lme(lnRR_root_shoot~as.factor(diversity_treatment)*as.factor(herbivory),
+                             data=subset(biomassTolerance, diversity_treatment!=0), 
+                             random=~1|block))
+anova.lme(rootShootTolANOVA, type='marginal') #no effect
+
+
+###tolerance figure
+heightPlot <- ggplot(data=barGraphStats(data=growthTolerance, variable="lnRR_height", byFactorNames=c("diversity_treatment", "herbivory")), aes(x=as.factor(diversity_treatment), y=mean, fill=herbivory)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Rhizobial Diversity') +
+  ylab('lnRR Height') +
+  scale_fill_manual(values=c('dark orange', 'dark green'),
+                    name='Simulated\nHerbivory')
+
+nodulePlot <- ggplot(data=barGraphStats(data=subset(nodulesTolerance, !is.na(lnRR_nodules)&lnRR_nodules<2&lnRR_nodules>-2), variable="lnRR_nodules", byFactorNames=c("diversity_treatment", "herbivory")), aes(x=as.factor(diversity_treatment), y=mean, fill=herbivory)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Rhizobial Diversity') +
+  ylab('lnRR Nodule Number') +
+  scale_fill_manual(values=c('dark orange', 'dark green'),
+                    name='Simulated\nHerbivory')
+
+shootPlot <- ggplot(data=barGraphStats(data=biomassTolerance, variable="lnRR_shoot", byFactorNames=c("diversity_treatment", "herbivory")), aes(x=as.factor(diversity_treatment), y=mean, fill=herbivory)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Rhizobial Diversity') +
+  ylab('lnRR Shoot Biomass') +
+  scale_fill_manual(values=c('dark orange', 'dark green'),
+                    name='Simulated\nHerbivory')
+
+rootPlot <- ggplot(data=barGraphStats(data=biomassTolerance, variable="lnRR_root", byFactorNames=c("diversity_treatment", "herbivory")), aes(x=as.factor(diversity_treatment), y=mean, fill=herbivory)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Rhizobial Diversity') +
+  ylab('lnRR Root Biomass') +
+  scale_fill_manual(values=c('dark orange', 'dark green'),
+                    name='Simulated\nHerbivory')
+
+
+#resilience figure
+ggarrange(shootPlot, heightPlot, rootPlot, nodulePlot,
+          ncol = 2, nrow = 2)
+#export at 180000x1800
+
+
+ggplot(data=barGraphStats(data=biomassTolerance, variable="lnRR_root_shoot", byFactorNames=c("diversity_treatment", "herbivory")), aes(x=as.factor(diversity_treatment), y=mean, fill=herbivory)) +
+  geom_bar(stat='identity', position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  xlab('Rhizobial Diversity') +
+  ylab('lnRR Root:Shoot') +
+  scale_fill_manual(values=c('dark orange', 'dark green'),
+                    name='Simulated\nHerbivory')
