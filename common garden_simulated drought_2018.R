@@ -6,14 +6,11 @@
 ################################################################################
 
 library(nlme)
-library(lsmeans)
+library(emmeans)
 library(pbkrtest)
 library(car)
-# library(ggeffects)
-# library(sjPlot)
-# library(grid)
+library(RVAideMemoire)
 library(performance)
-# library(piecewiseSEM)
 library(tidyverse)
 library(ggpubr)
 
@@ -159,6 +156,7 @@ summary(heightModel <- lme(log10(height_cm)~as.factor(diversity)*as.factor(warmi
                            random=~1|bed))
 check_model(heightModel)
 anova.lme(heightModel, type='sequential') #significant effect of warming
+back.emmeans(emmeans(heightModel, ~as.factor(warming)), transform='log', base=10)
 
 #height figure
 ggplot(data=barGraphStats(data=subset(growthData, doe==66&diversity!=0), variable="height_cm", byFactorNames=c("warming")), aes(x=as.factor(warming), y=mean)) +
@@ -195,7 +193,7 @@ summary(insectherbModel <- lme(sqrt(avg_perc_herbivory)~as.factor(diversity)*as.
                                control=lmeControl(returnObject=T)))
 check_model(insectherbModel)
 anova.lme(insectherbModel, type='sequential') #significant effect of diversity and marginally significant effect of warming
-lsmeans(insectherbModel, pairwise~as.factor(diversity), adjust="tukey")
+back.emmeans(emmeans(insectherbModel, pairwise~as.factor(diversity), adjust="tukey"), transform='sqrt')
 
 
 # #what you'd do with lmer
@@ -223,7 +221,7 @@ insectFig <- ggplot(data=barGraphStats(data=subset(herbivoryData, doy!=200 & div
 summary(aphidModel <- lme(Aphids~as.factor(diversity)*as.factor(warming), data=subset(insectData, diversity!=0), random=~1|bed))
 check_model(aphidModel)
 anova.lme(aphidModel, type='sequential') #warming and diversity interaction
-lsmeans(aphidModel, pairwise~as.factor(diversity)*as.factor(warming), adjust="tukey")
+emmeans(aphidModel, pairwise~as.factor(diversity)*as.factor(warming), adjust="tukey")
 
 summary(glm(Aphids~diversity, data=subset(insectData, warming==0))) #no effect
 summary(glm(Aphids~diversity, data=subset(insectData, warming==1))) #diversity effect
@@ -293,10 +291,11 @@ check_model(viableModel)
 anova.lme(viableModel, type='sequential') #no effect
 
 #aborted_pods
-summary(abortedModel <- lme(aborted_pods~as.factor(diversity)*as.factor(warming), data=subset(fitnessData, aborted_pods<9000&diversity!=0), random=~1|bed))
+summary(abortedModel <- lme(aborted_pods~as.factor(diversity)*as.factor(warming), data=subset(fitnessData, diversity!=0), random=~1|bed))
 check_model(abortedModel)
 anova.lme(abortedModel, type='sequential') #diversity and warming effects
-lsmeans(abortedModel, pairwise~as.factor(diversity)*as.factor(warming), adjust="tukey")
+emmeans(abortedModel, pairwise~as.factor(diversity), adjust="tukey")
+emmeans(abortedModel, pairwise~as.factor(warming), adjust="tukey")
 
 #healthy beans
 summary(healthyModel <- lme(healthy_beans~diversity*warming, data=subset(fitnessData, diversity!=0), random=~1|bed)) 
@@ -432,7 +431,7 @@ summary(insectherbModel <- lme(sqrt(avg_perc_herbivory)~as.factor(strains_code)*
                                control=lmeControl(returnObject=T)))
 check_model(insectherbModel)
 anova.lme(insectherbModel, type='sequential') #marginally significant effect of strain
-lsmeans(insectherbModel, pairwise~as.factor(strains_code), adjust="tukey")
+emmeans(insectherbModel, pairwise~as.factor(strains_code), adjust="tukey")
 
 insectMonoculturePlot <- ggplot(data=barGraphStats(data=subset(herbivoryData, doy!=200&diversity==1), variable="avg_perc_herbivory", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
   geom_bar(stat='identity', position=position_dodge(width=0.25), fill='white', color='black') +
@@ -484,7 +483,7 @@ summary(beansMonocultureModel <- lme(total_pods~strains_code*warming, random=~1|
                                      data=subset(fitnessData, diversity==1))) 
 check_model(beansMonocultureModel)
 anova.lme(beansMonocultureModel, type='sequential') #strain
-lsmeans(beansMonocultureModel, pairwise~as.factor(strains_code), adjust="tukey")
+emmeans(beansMonocultureModel, pairwise~as.factor(strains_code), adjust="tukey")
 
 
 #healthy beans
@@ -492,7 +491,7 @@ summary(beansMonocultureModel <- lme(healthy_beans~strains_code*warming, random=
                                       data=subset(fitnessData, diversity==1))) 
 check_model(beansMonocultureModel)
 anova.lme(beansMonocultureModel, type='sequential') #strain
-lsmeans(beansMonocultureModel, pairwise~as.factor(strains_code), adjust="tukey")
+emmeans(beansMonocultureModel, pairwise~as.factor(strains_code), adjust="tukey")
 
 ggplot(data=barGraphStats(data=subset(fitnessData, diversity==1), variable="healthy_beans", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
   geom_bar(stat='identity', position=position_dodge(width=0.25), color='black', fill='white') +
@@ -520,14 +519,14 @@ summary(beansMonocultureModel <- lme(total_beans~strains_code*warming, random=~1
                                      data=subset(fitnessData, diversity==1))) 
 check_model(beansMonocultureModel)
 anova.lme(beansMonocultureModel) #strain
-lsmeans(beansMonocultureModel, pairwise~as.factor(strains_code), adjust="tukey")
+emmeans(beansMonocultureModel, pairwise~as.factor(strains_code), adjust="tukey")
 
 #bean weight
 summary(beansMonocultureModel <- lme(bean_weight_g~strains_code*warming, random=~1|bed,
                                      data=subset(fitnessData, diversity==1))) 
 check_model(beansMonocultureModel)
 anova.lme(beansMonocultureModel) #strain
-lsmeans(beansMonocultureModel, pairwise~as.factor(strains_code), adjust="tukey")
+emmeans(beansMonocultureModel, pairwise~as.factor(strains_code), adjust="tukey")
 
 # ggplot(data=barGraphStats(data=subset(fitnessData, diversity==1), variable="bean_weight_g", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
 #   geom_bar(stat='identity', position=position_dodge(width=0.25), color='black', fill='white') +
