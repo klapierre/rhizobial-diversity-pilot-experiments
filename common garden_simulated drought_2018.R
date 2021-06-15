@@ -13,7 +13,7 @@ library(car)
 # library(sjPlot)
 # library(grid)
 library(performance)
-library(piecewiseSEM)
+# library(piecewiseSEM)
 library(tidyverse)
 library(ggpubr)
 
@@ -48,6 +48,9 @@ barGraphStats <- function(data, variable, byFactorNames) {
   finalSummaryStats$se <- finalSummaryStats$sd / sqrt(finalSummaryStats$N)
   return(finalSummaryStats)
 }
+
+
+options(contrasts=c('contr.sum','contr.poly'))
 
 #not in function
 `%!in%` = Negate(`%in%`)
@@ -118,13 +121,13 @@ insectData <- read.csv('soy pilot_2018_common garden_insects.csv')%>%
   mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=as.numeric(strftime(date2, format = "%j")), doe=(doy-169))%>%
   left_join(growthDataInsectCovariate)
 
-flowerData <- read.csv('soy pilot_2018_common garden_growth.csv')%>%
-  mutate(bed=as.factor(bed), plant=as.factor(plant), warming=as.factor(warming))%>%
-  left_join(trt)%>%
-  select(-height_cm, -num_leaves)%>%
-  filter(num_flowers<9000, num_pods<9000)%>%
-  filter(plant %!in% c(635,900,1062,1073,2557))%>% #drop plants that died
-  mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=as.numeric(strftime(date2, format = "%j")), doe=(doy-169))
+# flowerData <- read.csv('soy pilot_2018_common garden_growth.csv')%>%
+#   mutate(bed=as.factor(bed), plant=as.factor(plant), warming=as.factor(warming))%>%
+#   left_join(trt)%>%
+#   select(-height_cm, -num_leaves)%>%
+#   filter(num_flowers<9000, num_pods<9000)%>%
+#   filter(plant %!in% c(635,900,1062,1073,2557))%>% #drop plants that died
+#   mutate(date2=as.Date(date, format='%m/%d/%Y'), doy=as.numeric(strftime(date2, format = "%j")), doe=(doy-169))
 
 weightData <- read.csv('soy pilot_2018_common garden_bean weight.csv')%>%
   mutate(bed=as.factor(bed), plant=as.factor(plant), warming=as.factor(warming))
@@ -150,42 +153,23 @@ fitnessData <- read.csv('soy pilot_2018_common garden_pods.csv')%>%
 #   facet_wrap(~plant)
 # hist(log10(growthData$height_cm))
 
-#model -- repeated measures to examine the effects of treatments on growth rate (slope of height through time, fixed intercept)
-summary(heightModel <- lme(log10(height_cm)~as.factor(diversity)*as.factor(warming)*doe,
-                           data=subset(growthData, doy!=200&diversity!=0), 
-                           random=~1|bed,
-                           correlation=corAR1(form=~doe|bed/plant),
-                           control=lmeControl(returnObject=T)))
+#model -- height at final date of measurement (pre-senescence)
+summary(heightModel <- lme(log10(height_cm)~as.factor(diversity)*as.factor(warming),
+                           data=subset(growthData, doe==66&diversity!=0), 
+                           random=~1|bed))
 check_model(heightModel)
-anova.lme(heightModel, type='sequential') #significant effects of warming and day of expt
+anova.lme(heightModel, type='sequential') #significant effect of warming
 
 #height figure
-ggplot(data=barGraphStats(data=subset(growthData, doy!=200&diversity!=0), variable="height_cm", byFactorNames=c("warming")), aes(x=as.factor(warming), y=mean)) +
+ggplot(data=barGraphStats(data=subset(growthData, doe==66&diversity!=0), variable="height_cm", byFactorNames=c("warming")), aes(x=as.factor(warming), y=mean)) +
   geom_bar(stat='identity', position=position_dodge(), fill='white', color='black') +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
   scale_x_discrete(breaks=c(0,1), labels=c("Control", "Drought")) +
   xlab('') + ylab('Height (cm)') +
-  annotate('text', x=1, y=33, label='a', size=8) +
-  annotate('text', x=2, y=36, label='b', size=8)
+  annotate('text', x=1, y=45, label='a', size=8) +
+  annotate('text', x=2, y=51, label='b', size=8)
 #export at 800 x 800
 
-
-# ##growth rate (cm/day)---------
-# #data check
-# ggplot(data=growthRate, aes(x=rate_period, y=growth_rate)) +
-#   geom_point() +
-#   facet_wrap(~plant)
-# 
-# summary(growthModel <- lme(growth_rate~as.factor(diversity)*as.factor(warming)*rate_period, data=subset(growthRate, rate_period!='rate_3'&diversity!=0), 
-#                            random=~1|bed, 
-#                            correlation=corAR1(form=~rate_period|bed/plant),
-#                            control=lmeControl(returnObject=T), weights=varIdent(form=~1|diversity*warming)))
-# anova(growthModel) #significant effects of warming and day of expt
-# check_model(growthModel)
-# 
-#           
-#           lmer(growth_rate~diversity*warming + (1|bed/plant), data=subset(growthRate, rate_period!='rate_3'))) #no effects
-# check_model(growthModel)
 
 
 ###leaf number---------
@@ -193,25 +177,6 @@ ggplot(data=barGraphStats(data=subset(growthData, doy!=200&diversity!=0), variab
 # ggplot(data=growthData, aes(x=doy, y=num_leaves)) +
 #   geom_point() +
 #   facet_wrap(~plant)
-
-#model
-summary(leafModel <- lme(log10(num_leaves)~as.factor(diversity)*as.factor(warming)*doe,
-                         data=subset(growthData, doy!=200&diversity!=0&num_leaves>0), 
-                         random=~1|bed, 
-                         correlation=corAR1(form=~doe|bed/plant),
-                         control=lmeControl(returnObject=T)))
-check_model(leafModel)
-anova.lme(leafModel, type='sequential') #significant effect of day of expt and warming*doe interaction
-lsmeans(leafModel, pairwise~as.factor(diversity), adjust="tukey")
-
-#leaf num figure
-ggplot(barGraphStats(data=subset(growthData, doy!=200&diversity!=0&num_leaves>0), variable="num_leaves", byFactorNames=c("diversity")), aes(x=as.factor(diversity), y=mean)) +
-  geom_point(position=position_dodge(0.9), size=4) +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
-  xlab('Rhizobial Diversity') + ylab('Number of Leaves') +
-  scale_y_continuous(trans='log10') + 
-  theme(legend.position=c(0.1, 0.85))
-#export at 800 x 600
 
 
 
@@ -222,16 +187,27 @@ ggplot(barGraphStats(data=subset(growthData, doy!=200&diversity!=0&num_leaves>0)
 #   facet_wrap(~plant)
 
 #model
-summary(insectherbModel <- lme(sqrt(avg_perc_herbivory)~as.factor(diversity)*as.factor(warming)*doe,
+### start here and think about correlation structure
+summary(insectherbModel <- lme(sqrt(avg_perc_herbivory)~as.factor(diversity)*as.factor(warming),
                                data=subset(herbivoryData, doy!=200&diversity!=0), 
                                random=~1|bed, 
                                correlation=corAR1(form=~doe|bed/plant),
                                control=lmeControl(returnObject=T)))
 check_model(insectherbModel)
-anova.lme(insectherbModel, type='sequential') #significant effect of diversity and day of expt
+anova.lme(insectherbModel, type='sequential') #significant effect of diversity and marginally significant effect of warming
 lsmeans(insectherbModel, pairwise~as.factor(diversity), adjust="tukey")
 
-#insect damage figure
+
+# #what you'd do with lmer
+# summary(mod.pot<-lmer(sqrt(avg_perc_herbivory)~as.factor(diversity)*as.factor(warming) +
+#                 (1|bed)+(1|doe), #this keeps random effects seperate
+#               data=subset(herbivoryData, doy!=200&diversity!=0)))
+# anova(mod.pot)
+# means<-emmeans(mod.pot,~as.factor(diversity),mode = "satterthwaite") #gets the model estimates (can also backtransform somehow) to generate effect sizes (for example, could say that diversity level 3 has X% less damage than diversity level 1)
+# plot(means, comparisons=T)
+
+
+#insect damage figure - diversity
 insectFig <- ggplot(data=barGraphStats(data=subset(herbivoryData, doy!=200 & diversity!=0), variable="avg_perc_herbivory", byFactorNames=c("diversity")), aes(x=as.factor(diversity), y=mean)) +
   geom_bar(stat='identity', position=position_dodge(), fill='white', color='black') +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
@@ -244,16 +220,16 @@ insectFig <- ggplot(data=barGraphStats(data=subset(herbivoryData, doy!=200 & div
 #export at 800 x 800
 
 ###aphid number---------
-summary(aphidModel <- lme(Aphids~as.factor(diversity)*as.factor(warming), data=subset(insectData, Aphids<9000&diversity!=0), random=~1|bed))
+summary(aphidModel <- lme(Aphids~as.factor(diversity)*as.factor(warming), data=subset(insectData, diversity!=0), random=~1|bed))
 check_model(aphidModel)
 anova.lme(aphidModel, type='sequential') #warming and diversity interaction
 lsmeans(aphidModel, pairwise~as.factor(diversity)*as.factor(warming), adjust="tukey")
 
-summary(glm(Aphids~diversity, data=subset(insectData, Aphids<9000&warming==0))) #no effect
-summary(glm(Aphids~diversity, data=subset(insectData, Aphids<9000&warming==1))) #diversity effect
+summary(glm(Aphids~diversity, data=subset(insectData, warming==0))) #no effect
+summary(glm(Aphids~diversity, data=subset(insectData, warming==1))) #diversity effect
 
 
-aphidFig <- ggplot(data=barGraphStats(data=subset(insectData, Aphids<9000&diversity!=0), variable="Aphids", byFactorNames=c("warming", "diversity")), aes(x=as.factor(diversity), y=mean, fill=as.factor(warming))) +
+aphidFig <- ggplot(data=barGraphStats(data=subset(insectData, diversity!=0), variable="Aphids", byFactorNames=c("warming", "diversity")), aes(x=as.factor(diversity), y=mean, fill=as.factor(warming))) +
   geom_bar(stat='identity', position=position_dodge()) +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.9), width=0.2) +
   scale_fill_manual(values=c('#666666', '#cc0000'),
@@ -272,6 +248,7 @@ aphidFig <- ggplot(data=barGraphStats(data=subset(insectData, Aphids<9000&divers
   annotate('text', x=0.5, y=1000, label='(a)', size=8)
 #export at 800x800
 
+
 ###rabbit herbivory---------
 leavesPreRabbit <- growthData%>%
   filter(date=='7/11/2018')%>%
@@ -289,19 +266,11 @@ rabbitData <- growthData%>%
 summary(rabbitModel <- lme(percent_rabbit_herb~as.factor(diversity)*as.factor(warming),
             data=subset(rabbitData, diversity!=0),
             random=~1|bed))
+check_model(rabbitModel)
 anova.lme(rabbitModel, type='sequential')  #no effect
 
 summary(lme(percent_rabbit_herb~diversity, data=subset(rabbitData, warming==0), random=~1|bed)) #no effect 
 summary(lme(percent_rabbit_herb~diversity, data=subset(rabbitData, warming==1), random=~1|bed)) #no effect
-
-# #absolute number of leaves removed by rabbit
-# summary(rabbitModel <- lme(leaves_rabbit_removed~as.factor(diversity)*as.factor(warming),
-#                            data=subset(rabbitData, diversity!=0),
-#                            random=~1|bed))
-# anova.lme(rabbitModel, type='sequential')  #no effect
-# 
-# summary(lme(leaves_rabbit_removed~diversity, data=subset(rabbitData, warming==0), random=~1|bed)) #no effect 
-# summary(lme(leaves_rabbit_removed~diversity, data=subset(rabbitData, warming==1), random=~1|bed)) #no effect
 
 rabbitFig <- ggplot(data=barGraphStats(data=subset(rabbitData, date=='7/19/2018'&diversity!=0), variable="percent_rabbit_herb", byFactorNames=c("diversity")), aes(x=as.factor(diversity), y=mean)) +
   geom_bar(stat='identity', position=position_dodge(), fill='white', color='black') +
@@ -318,209 +287,36 @@ ggarrange(aphidFig, insectFig, rabbitFig,
 
 
 
-# ###flower number---------
-# summary(flowerModel <- lme(num_flowers~as.factor(diversity)*as.factor(warming), data=subset(flowerData, num_flowers<9000&date=='8/23/2018'&diversity!=0), random=~1|bed))
-# Anova(flowerModel,type=2) #warming effect
-# 
-# flowerFig <- ggplot(data=barGraphStats(data=subset(flowerData, date=='8/23/2018'&diversity!=0), variable="num_flowers", byFactorNames=c("warming")), aes(x=as.factor(warming), y=mean)) +
-#   geom_bar(stat='identity', position=position_dodge(), fill='white', color='black') +
-#   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(0.9), width=0.2) +
-#   scale_x_discrete(breaks=c(0,1), labels=c('Control', 'Drought')) +
-#   xlab('') + ylab('Flower Number') +
-#   theme(axis.title.y=element_text(vjust=1)) +
-#   annotate('text', x=1, y=45, label='a', size=8) +
-#   annotate('text', x=2, y=25, label='b', size=8) +
-#   annotate('text', x=0.5, y=45, label='(a)', size=8)
-# 
-# flowerFig2 <- ggplot(data=barGraphStats(data=subset(flowerData, date=='8/23/2018'&diversity!=0), variable="num_flowers", byFactorNames=c("warming", "diversity")), aes(x=as.factor(warming), y=mean, fill=as.factor(diversity))) +
-#   geom_bar(stat='identity', position=position_dodge()) +
-#   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.9), width=0.2) +
-#   scale_fill_manual(values=c('#f37735', '#00b159', '#00aedb'),
-#                     breaks=c(1,2,3),
-#                     labels=c('1 strain', '2 strains', '3 strains'),
-#                     name='Rhizobial\nDiversity') +
-#   scale_x_discrete(breaks=c(0,1),
-#                    labels=c('Control', 'Drought')) +
-#   xlab('') + ylab('Flower Number') +
-#   theme(axis.title.y=element_text(vjust=1), legend.position=c(0.98,0.98), legend.justification=c(1,1)) +
-#   annotate('text', x=0.7, y=44, label='a', size=8) +
-#   annotate('text', x=1, y=44, label='a', size=8) +
-#   annotate('text', x=1.3, y=50, label='a', size=8) +
-#   annotate('text', x=1.7, y=27, label='b', size=8) +
-#   annotate('text', x=2, y=24, label='b', size=8) +
-#   annotate('text', x=2.3, y=26, label='b', size=8) +
-#   annotate('text', x=0.5, y=50, label='(a)', size=8)
-
-
-###pods---------
-# #total pods
-# summary(lme(total_pods~as.factor(diversity)*as.factor(warming), data=subset(fitnessData, total_pods<9000), random=~1|bed)) #no effect
-# summary(glm(total_pods~diversity, data=subset(fitnessData, total_pods<9000&warming==0))) #no effect
-# summary(glm(total_pods~diversity, data=subset(fitnessData, total_pods<9000&warming==1))) #no effect
-# 
-# ggplot(data=barGraphStats(data=subset(fitnessData, total_pods<9000&diversity!=0), variable="total_pods", byFactorNames=c("warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) +
-#   geom_point(size=5, position=position_dodge(width=0.25)) +
-#   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
-#   scale_color_manual(values=c('#0072B2', '#D55E00'),
-#                      breaks=c(0,1),
-#                      labels=c('Control', 'Drought'),
-#                      name='Drought\nTreatment') +
-#   xlab('Rhizobial Diversity') + ylab('Total Pod Number') +
-#   theme(axis.title.y=element_text(vjust=1))
-# #export at 665 x 610
-
-
 #viable pods---------
-summary(viableModel <- lme(viable_pods~as.factor(diversity)*as.factor(warming), data=subset(fitnessData, viable_pods<9000&diversity!=0), random=~1|bed))
-anova.lme(viableModel, type='marginal') #no effect
-
-summary(glm(viable_pods~diversity, data=subset(fitnessData, viable_pods<9000&warming==0))) #no effect
-summary(glm(viable_pods~diversity, data=subset(fitnessData, viable_pods<9000&warming==1))) #no effect
-
-viableFig <- ggplot(data=barGraphStats(data=subset(fitnessData, viable_pods>0&diversity!=0), variable="viable_pods", byFactorNames=c("warming", "diversity")), aes(x=as.factor(warming), y=mean, fill=as.factor(diversity))) +
-  geom_bar(stat='identity', position=position_dodge()) +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.9), width=0.2) +
-  scale_fill_manual(values=c('#f37735', '#00b159', '#00aedb'),
-                    breaks=c(1,2,3),
-                    labels=c('1 strain', '2 strains', '3 strains'),
-                    name='Rhizobial\nDiversity') +
-  scale_x_discrete(breaks=c(0,1),
-                   labels=c('Control', 'Drought')) +
-  xlab('') + ylab('Viable Pod Number') +
-  theme(axis.title.y=element_text(vjust=1), legend.position='none') +
-  annotate('text', x=0.5, y=125, label='(c)', size=8)
-#export at 800x800
-
+summary(viableModel <- lme(viable_pods~as.factor(diversity)*as.factor(warming), data=subset(fitnessData, diversity!=0), random=~1|bed))
+check_model(viableModel)
+anova.lme(viableModel, type='sequential') #no effect
 
 #aborted_pods
 summary(abortedModel <- lme(aborted_pods~as.factor(diversity)*as.factor(warming), data=subset(fitnessData, aborted_pods<9000&diversity!=0), random=~1|bed))
-anova.lme(abortedModel, type='marginal') #diversity and warming effects
+check_model(abortedModel)
+anova.lme(abortedModel, type='sequential') #diversity and warming effects
 lsmeans(abortedModel, pairwise~as.factor(diversity)*as.factor(warming), adjust="tukey")
 
-summary(glm(aborted_pods~diversity, data=subset(fitnessData, aborted_pods<9000&warming==0))) #no effect
-summary(glm(aborted_pods~diversity, data=subset(fitnessData, aborted_pods<9000&warming==1))) #no effect
-
-abortedFig <- ggplot(data=barGraphStats(data=subset(fitnessData, aborted_pods<9000&diversity!=0), variable="aborted_pods", byFactorNames=c("warming", "diversity")), aes(x=as.factor(warming), y=mean, fill=as.factor(diversity))) +
-  geom_bar(stat='identity', position=position_dodge()) +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.9), width=0.2) +
-  scale_fill_manual(values=c('#f37735', '#00b159', '#00aedb'),
-                     breaks=c(1,2,3),
-                     labels=c('1 strain', '2 strains', '3 strains'),
-                     name='Rhizobial\nDiversity') +
-  scale_x_discrete(breaks=c(0,1),
-                   labels=c('Control', 'Drought')) +
-  xlab('') + ylab('Aborted Pod Number') +
-  theme(axis.title.y=element_text(vjust=1), legend.position='none') +
-  annotate('text', x=0.7, y=16, label='a', size=8) +
-  annotate('text', x=1, y=13, label='ab', size=8) +
-  annotate('text', x=1.3, y=11, label='b', size=8) +
-  annotate('text', x=1.7, y=8, label='b', size=8) +
-  annotate('text', x=2, y=8, label='b', size=8) +
-  annotate('text', x=2.3, y=7, label='b', size=8) +
-  annotate('text', x=0.5, y=16, label='(b)', size=8)
-#export at 800x800
-
-
-# #total beans
-# summary(totalBeanModel <- lme(total_beans~diversity*warming, random=~1|bed, data=subset(fitnessData, total_beans<9000&diversity!=0))) #no effect
-# anova(totalBeanModel)
-# summary(glm(total_beans~diversity, data=subset(fitnessData, total_beans<9000&warming==0))) #no effect
-# summary(glm(total_beans~diversity, data=subset(fitnessData, total_beans<9000&warming==1))) #no effect
-# 
-# ggplot(data=barGraphStats(data=subset(fitnessData, total_beans<9000&diversity!=0), variable="total_beans", byFactorNames=c("warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) +
-#   geom_point(size=5, position=position_dodge(width=0.25)) +
-#   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
-#   scale_color_manual(values=c('#0072B2', '#D55E00'),
-#                      breaks=c(0,1),
-#                      labels=c('Control', 'Drought')) +
-#   xlab('Rhizobial Diversity') + ylab('Total Bean Number') +
-#   theme(axis.title.y=element_text(vjust=1))
-# #export at 665 x 610
-
-
 #healthy beans
-summary(healthyModel <- lme(healthy_beans~diversity*warming, data=subset(fitnessData, healthy_beans<9000&diversity!=0), random=~1|bed)) 
-anova.lme(healthyModel, type='marginal') #marginal interaction, warming effect
+summary(healthyModel <- lme(healthy_beans~diversity*warming, data=subset(fitnessData, diversity!=0), random=~1|bed)) 
+check_model(healthyModel)
+anova.lme(healthyModel, type='sequential') #marginal interaction
 
-summary(glm(healthy_beans~diversity, data=subset(fitnessData, healthy_beans<9000&warming==0))) #no effect
-summary(glm(healthy_beans~diversity, data=subset(fitnessData, healthy_beans<9000&warming==1))) #no effect
+#damaged beans
+summary(damagedModel <- lme(damaged_beans~diversity*warming, data=subset(fitnessData, diversity!=0), random=~1|bed)) 
+check_model(damagedModel)
+anova.lme(damagedModel, type='sequential') #no effect
 
-ggplot(data=barGraphStats(data=subset(fitnessData, healthy_beans<9000&diversity!=0), variable="healthy_beans", byFactorNames=c("warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) +
-  geom_point(size=5, position=position_dodge(width=0.25)) +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
-  scale_color_manual(values=c('#0072B2', '#D55E00'),
-                     breaks=c(0,1),
-                     labels=c('Control', 'Drought')) +
-  xlab('Rhizobial Diversity') + ylab('Healthy Bean Number') +
-  theme(axis.title.y=element_text(vjust=1))
-#export at 665 x 610
-
-
-# #damaged beans
-# summary(damagedModel <- lme(damaged_beans~diversity*warming, data=subset(fitnessData, damaged_beans<9000&diversity!=0), random=~1|bed))
-# Anova(damagedModel, type=2) #no effect
-# 
-# summary(glm(damaged_beans~diversity, data=subset(fitnessData, damaged_beans<9000&warming==0))) #no effect
-# summary(glm(damaged_beans~diversity, data=subset(fitnessData, damaged_beans<9000&warming==1))) #no effect
-# 
-# ggplot(data=barGraphStats(data=subset(fitnessData, damaged_beans<9000&diversity!=0), variable="damaged_beans", byFactorNames=c("warming", "diversity")), aes(x=as.factor(diversity), y=mean, color=as.factor(warming))) +
-#   geom_point(size=5, position=position_dodge(width=0.25)) +
-#   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
-#   scale_color_manual(values=c('#0072B2', '#D55E00'),
-#                      breaks=c(0,1),
-#                      labels=c('Control', 'Drought')) +
-#   xlab('Rhizobial Diversity') + ylab('Healthy Bean Number') +
-#   theme(axis.title.y=element_text(vjust=1))
-# #export at 665 x 610
-
-
-# #aborted beans
-# summary(abortedBeansModel <- lme(aborted_beans~diversity*warming, data=subset(fitnessData, aborted_beans<9000&diversity!=0), random=~1|bed)) 
-# Anova(abortedBeansModel, type=2) #no effect
-# summary(glm(aborted_beans~diversity, data=subset(fitnessData, aborted_beans<9000&warming==0))) #no effect
-# summary(glm(aborted_beans~diversity, data=subset(fitnessData, aborted_beans<9000&warming==1))) #no effect
-# 
-# ggplot(data=barGraphStats(data=subset(fitnessData, aborted_beans<9000&diversity!=0), variable="aborted_beans", byFactorNames=c("warming", "diversity")), aes(x=as.factor(warming), y=mean, fill=as.factor(diversity))) +
-#   geom_bar(stat='identity', position=position_dodge()) +
-#   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.9), width=0.2) +
-#   scale_fill_manual(values=c('#f37735', '#00b159', '#00aedb'),
-#                     breaks=c(1,2,3),
-#                     labels=c('1 strain', '2 strains', '3 strains'),
-#                     name='Rhizobial\nDiversity') +
-#   scale_x_discrete(breaks=c(0,1),
-#                    labels=c('Control', 'Drought')) +
-#   xlab('') + ylab('Aborted Beans') +
-#   theme(axis.title.y=element_text(vjust=1), legend.position='none')
-# #export at 665 x 610
-
+#aborted beans
+summary(abortedBeansModel <- lme(aborted_beans~diversity*warming, data=subset(fitnessData, diversity!=0), random=~1|bed)) 
+check_model(abortedBeansModel)
+anova.lme(abortedBeansModel, type='sequential') #no effect
 
 #bean weight
 summary(weightModel <- lme(bean_weight_g~as.factor(diversity)*as.factor(warming), data=subset(fitnessData, bean_weight_g<900&diversity!=0), random=~1|bed)) 
-anova.lme(weightModel, type='marginal') #no effect
-summary(glm(bean_weight_g~diversity, data=subset(fitnessData, bean_weight_g<900&warming==0))) #no effect
-summary(glm(bean_weight_g~diversity, data=subset(fitnessData, bean_weight_g<900&warming==1))) #diversity effect
-
-weightFig <- ggplot(data=barGraphStats(data=subset(fitnessData, bean_weight_g<900&diversity!=0), variable="bean_weight_g", byFactorNames=c("warming", "diversity")), aes(x=as.factor(warming), y=mean, fill=as.factor(diversity))) +
-  geom_bar(stat='identity', position=position_dodge()) +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.9), width=0.2) +
-  scale_fill_manual(values=c('#f37735', '#00b159', '#00aedb'),
-                    breaks=c(1,2,3),
-                    labels=c('1 strain', '2 strains', '3 strains'),
-                    name='Rhizobial\nDiversity') +
-  scale_x_discrete(breaks=c(0,1),
-                   labels=c('Control', 'Drought')) +
-  xlab('') + ylab('Bean Weight (g)') +
-  theme(axis.title.y=element_text(vjust=1), legend.position='none') +
-  annotate('text', x=0.5, y=53,label='(d)', size=8)
-#export at 665 x 610
-
-
-#pods, and weight
-ggarrange(abortedFig, viableFig, weightFig,
-          ncol = 1, nrow = 3)
-#export at 1800x1800
-
-
+check_model(weightModel)
+anova.lme(weightModel, type='sequential') #no effect
 
 
 
@@ -549,31 +345,6 @@ summary(lme(percent_rabbit_herb ~ Aphids, data=regData, random=~1|bed)) #no corr
 summary(lm(sqrt(avg_insect_herb) ~ Aphids, data=regData)) #negative correlation
 
 
-# #viable pods
-# summary(lm(viable_pods ~ sqrt(avg_insect_herb)*num_leaflets, data=regData)) #significant decrease
-# summary(lm(viable_pods ~ Aphids*num_leaflets, data=regData)) #significant increase
-# summary(lm(viable_pods ~ percent_rabbit_herb*num_leaflets, data=regData)) #significnat decrease
-# 
-# #aborted pods
-# summary(lm(aborted_pods ~ sqrt(avg_insect_herb)*num_leaflets, data=regData)) #no effect
-# summary(lm(aborted_pods ~ Aphids*num_leaflets, data=regData)) #no effect
-# summary(lm(aborted_pods ~ percent_rabbit_herb*num_leaflets, data=regData)) #no effect
-# 
-# #total pods
-# summary(lm(total_pods ~ sqrt(avg_insect_herb), data=regData)) #marginally significant decrease
-# summary(lm(total_pods ~ Aphids, data=regData)) #significant increase
-# summary(lm(total_pods ~ percent_rabbit_herb, data=regData)) #significant decrease
-# 
-# #bean weight
-# summary(lm(bean_weight_g ~ sqrt(avg_insect_herb)*num_leaflets, data=regData)) #no effect
-# summary(lm(bean_weight_g ~ Aphids*num_leaflets, data=regData)) #no effect
-# summary(lm(bean_weight_g ~ percent_rabbit_herb*num_leaflets, data=regData)) #no effect
-# 
-# #healthy bean number
-# summary(lm(healthy_beans ~ sqrt(avg_insect_herb)*num_leaflets, data=regData)) #significant decrease
-# summary(lm(healthy_beans ~ Aphids*num_leaflets, data=regData)) #significant increase
-# summary(lm(healthy_beans ~ percent_rabbit_herb*num_leaflets, data=regData)) #significant decrease
-
 ###residuals to account for plant size
 healthyBeansResiduals <- as.data.frame(residuals(lm(healthy_beans~num_leaflets, data=regData)))%>%
   cbind(regData)
@@ -584,60 +355,47 @@ summary(lm(residuals ~ sqrt(avg_insect_herb), data=healthyBeansResiduals))
 summary(lm(residuals ~ Aphids, data=healthyBeansResiduals)) #significant increase
 summary(lm(residuals ~ percent_rabbit_herb, data=healthyBeansResiduals))
 
-# ggplot(data=healthyBeansResiduals, aes(x=Aphids, y=residuals)) +
-#   geom_point(size=3, aes(shape=warming, color=as.factor(diversity))) +
-#   xlab('Aphid Number') + ylab('Healthy Bean Number') +
-#   scale_color_manual(values=c('#f37735', '#00b159', '#00aedb'),
-#                      breaks=c(1,2,3),
-#                      labels=c('1 strain', '2 strains', '3 strains'),
-#                      name='Rhizobial\nDiversity') +
-#   scale_shape_manual(values=c(19,17),
-#                      breaks=c(0,1),
-#                      labels=c('Control', 'Drought'),
-#                      name='Drought\nTreatment') +
-#   stat_smooth(method='lm', color='black', se=F) +
-#   scale_x_continuous(trans='log10')
 
 #figure
 aphidBeansFig <- ggplot(data=regData, aes(x=Aphids, y=healthy_beans)) +
-  geom_point(size=3, aes(shape=warming, color=as.factor(diversity))) +
+  geom_point(size=3, aes(shape=as.factor(diversity), color=as.factor(warming))) +
   xlab('Aphid Number') + ylab('Healthy Bean Number') +
-  scale_color_manual(values=c('#f37735', '#00b159', '#00aedb'),
-                    breaks=c(1,2,3),
-                    labels=c('1 strain', '2 strains', '3 strains'),
-                    name='Rhizobial\nDiversity') +
-  scale_shape_manual(values=c(19,17),
-                     breaks=c(0,1),
-                     labels=c('Control', 'Drought'),
-                     name='Drought\nTreatment') +
+  scale_color_manual(values=c('#666666', '#cc0000'),
+                    breaks=c(0,1),
+                    labels=c('control', 'drought'),
+                    name='Drought\nTreatment') +
+  scale_shape_manual(values=c(19,17,15),
+                     breaks=c(1,2,3),
+                     labels=c('1 strain', '2 strains', '3 strains'),
+                     name='Diversity\nTreatment') +
   stat_smooth(method='lm', color='black', se=F) +
   scale_x_continuous(trans='log10')
 
 insectBeansFig <- ggplot(data=regData, aes(x=avg_insect_herb, y=healthy_beans)) +
-  geom_point(size=3, aes(shape=warming, color=as.factor(diversity))) +
+  geom_point(size=3, aes(shape=as.factor(diversity), color=as.factor(warming))) +
   xlab('Insect Damage (%)') + ylab('Healthy Bean Number') +
-  scale_color_manual(values=c('#f37735', '#00b159', '#00aedb'),
+  scale_color_manual(values=c('#666666', '#cc0000'),
+                     breaks=c(0,1),
+                     labels=c('control', 'drought'),
+                     name='Drought\nTreatment') +
+  scale_shape_manual(values=c(19,17,15),
                      breaks=c(1,2,3),
                      labels=c('1 strain', '2 strains', '3 strains'),
-                     name='Rhizobial\nDiversity') +
-  scale_shape_manual(values=c(19,17),
-                     breaks=c(0,1),
-                     labels=c('Control', 'Drought'),
-                     name='Drought\nTreatment') +
+                     name='Diversity\nTreatment') +
   # stat_smooth(method='lm', color='black', se=F) +
   scale_x_continuous(trans='sqrt')
 
 rabbitBeansFig <- ggplot(data=regData, aes(x=percent_rabbit_herb, y=healthy_beans)) +
-  geom_point(size=3, aes(shape=warming, color=as.factor(diversity))) +
+  geom_point(size=3, aes(shape=as.factor(diversity), color=as.factor(warming))) +
   xlab('Rabbit Damage (%)') + ylab('Healthy Bean Number') +
-  scale_color_manual(values=c('#f37735', '#00b159', '#00aedb'),
+  scale_color_manual(values=c('#666666', '#cc0000'),
+                     breaks=c(0,1),
+                     labels=c('control', 'drought'),
+                     name='Drought\nTreatment') +
+  scale_shape_manual(values=c(19,17,15),
                      breaks=c(1,2,3),
                      labels=c('1 strain', '2 strains', '3 strains'),
-                     name='Rhizobial\nDiversity') +
-  scale_shape_manual(values=c(19,17),
-                     breaks=c(0,1),
-                     labels=c('Control', 'Drought'),
-                     name='Drought\nTreatment') 
+                     name='Diversity\nTreatment')
   # stat_smooth(method='lm', color='black', se=F)
 
 #aphid number, insect, and rabbit damage on healthy beans
@@ -647,45 +405,6 @@ ggarrange(aphidBeansFig, insectBeansFig, rabbitBeansFig,
 #export at 1800x600
 
 
-# #total bean number
-# summary(lm(total_beans ~ avg_insect_herb, data=regData)) #significant decrease
-# summary(lm(total_beans ~ Aphids, data=regData)) #significant increase
-# summary(lm(total_beans ~ percent_rabbit_herb, data=regData)) #significant decrease
-
-
-#SEM - model structure doesn't match previous stats, because diversity can't be included as a factor
-# modelAmbient <- psem(
-#   insectherbModel <- lme(sqrt(avg_insect_herb) ~ diversity,
-#                         data=subset(regData, warming==0),
-#                         random=~1|bed),
-#   aphidModel <- lme(Aphids ~ diversity, 
-#                     data=subset(regData, warming==0),
-#                     random=~1|bed),
-#   rabbitModel <- lme(percent_rabbit_herb ~ diversity, 
-#                      data=subset(regData, warming==0),
-#                      random=~1|bed),
-#   beanModel <- lme(healthy_beans ~ diversity + sqrt(avg_insect_herb) + Aphids + percent_rabbit_herb, 
-#                    data=subset(regData, warming==0),
-#                    random=~1|bed)
-# )
-# summary(modelAmbient)
-# 
-# 
-# modelDroughted <- psem(
-#   insectherbModel <- lme(sqrt(avg_insect_herb) ~ diversity,
-#                         data=subset(regData, warming==1),
-#                         random=~1|bed),
-#   aphidModel <- lme(Aphids ~ diversity, 
-#                    data=subset(regData, warming==1),
-#                    random=~1|bed),
-#   rabbitModel <- lme(percent_rabbit_herb ~ diversity, 
-#                     data=subset(regData, warming==1),
-#                     random=~1|bed),
-#   beanModel <- lme(healthy_beans ~ diversity + sqrt(avg_insect_herb) + Aphids + percent_rabbit_herb,
-#                   data=subset(regData, warming==1),
-#                   random=~1|bed)
-# )
-# summary(modelDroughted)
 
 
 
@@ -693,7 +412,8 @@ ggarrange(aphidBeansFig, insectBeansFig, rabbitBeansFig,
 #monocultures-----------
 #insect number
 summary(aphidsMonocultureModel <- lme(Aphids~strains_code*warming, data=subset(insectData, Aphids<9000&diversity==1), random=~1|bed)) 
-anova.lme(aphidsMonocultureModel, type='marginal') #warming 
+check_model(aphidsMonocultureModel)
+anova.lme(aphidsMonocultureModel, type='sequential') #warming 
 
 aphidMonoculturePlot <- ggplot(data=barGraphStats(data=subset(insectData, Aphids<9000&diversity==1), variable="Aphids", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
   geom_bar(stat='identity', position=position_dodge(), fill='white', color='black') +
@@ -705,13 +425,13 @@ aphidMonoculturePlot <- ggplot(data=barGraphStats(data=subset(insectData, Aphids
 
 
 ###insect herbivory---------
-summary(insectherbModel <- lme(sqrt(avg_perc_herbivory)~as.factor(strains_code)*as.factor(warming)*doe,
+summary(insectherbModel <- lme(sqrt(avg_perc_herbivory)~as.factor(strains_code)*as.factor(warming),
                                data=subset(herbivoryData, doy!=200&diversity==1), 
                                random=~1|bed, 
                                correlation=corAR1(form=~doe|bed/plant),
                                control=lmeControl(returnObject=T)))
 check_model(insectherbModel)
-anova.lme(insectherbModel, type='marginal') #no effect
+anova.lme(insectherbModel, type='sequential') #marginally significant effect of strain
 lsmeans(insectherbModel, pairwise~as.factor(strains_code), adjust="tukey")
 
 insectMonoculturePlot <- ggplot(data=barGraphStats(data=subset(herbivoryData, doy!=200&diversity==1), variable="avg_perc_herbivory", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
@@ -724,18 +444,22 @@ insectMonoculturePlot <- ggplot(data=barGraphStats(data=subset(herbivoryData, do
   annotate('text', x=0.6, y=4.5, label='(b)', size=8)
 #export at 800 x 800
 
-ggplot(data=barGraphStats(data=subset(herbivoryData, doy!=200&diversity!=0), variable="avg_perc_herbivory", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
-  geom_bar(stat='identity', position=position_dodge(width=0.25), color='black', fill='white') +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
-  xlab('Rhizobial Strain') + ylab('Healthy Bean Number') +
-  theme(axis.title.y=element_text(vjust=1))
-#export at 800x600
+# herbivoryData$strains_code <- factor(herbivoryData$strains_code, levels=c('A', 'B', 'C', 'D', 'AB', 'AC', 'AD', 'BC', 'BD', 'CD', 'ABC', 'ABD', 'BCD'))
+#   
+# ggplot(data=barGraphStats(data=subset(herbivoryData, doy!=200&diversity!=0), variable="avg_perc_herbivory", byFactorNames=c("strains_code", "doe")), aes(x=as.factor(strains_code), y=mean)) +
+#   geom_bar(stat='identity', position=position_dodge(width=0.25), color='black', fill='white') +
+#   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
+#   xlab('Rhizobial Strain') + ylab('Healthy Bean Number') +
+#   theme(axis.title.y=element_text(vjust=1)) +
+#   facet_wrap(~doe)
+# #export at 800x600
 
 
 ###rabbit herbivory---------
 summary(rabbitMonocultureModel <- lme(percent_rabbit_herb~strains_code*warming, random=~1|bed,
                                       data=subset(rabbitData, diversity==1))) 
-anova.lme(rabbitMonocultureModel, type='marginal') #no effect 
+check_model(rabbitMonocultureModel)
+anova.lme(rabbitMonocultureModel, type='sequential') #no effect 
 
 rabbitMonoculturePlot <- ggplot(data=barGraphStats(data=subset(rabbitData, date=='7/19/2018'&diversity==1), variable="percent_rabbit_herb", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
   geom_bar(position=position_dodge(width=0.25), stat='identity', color='black', fill='white') +
@@ -756,12 +480,21 @@ ggarrange(aphidMonoculturePlot, insectMonoculturePlot, rabbitMonoculturePlot,
 
 
 ###total pods-----------------------
-summary(beansMonocultureModel <- lme(healthy_beans~strains_code*warming, random=~1|bed,
-                                      data=subset(fitnessData, total_pods<9000&diversity==1))) 
-anova.lme(beansMonocultureModel, type='marginal') #strain
+summary(beansMonocultureModel <- lme(total_pods~strains_code*warming, random=~1|bed,
+                                     data=subset(fitnessData, diversity==1))) 
+check_model(beansMonocultureModel)
+anova.lme(beansMonocultureModel, type='sequential') #strain
 lsmeans(beansMonocultureModel, pairwise~as.factor(strains_code), adjust="tukey")
 
-ggplot(data=barGraphStats(data=subset(fitnessData, healthy_beans<9000&diversity==1), variable="healthy_beans", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
+
+#healthy beans
+summary(beansMonocultureModel <- lme(healthy_beans~strains_code*warming, random=~1|bed,
+                                      data=subset(fitnessData, diversity==1))) 
+check_model(beansMonocultureModel)
+anova.lme(beansMonocultureModel, type='sequential') #strain
+lsmeans(beansMonocultureModel, pairwise~as.factor(strains_code), adjust="tukey")
+
+ggplot(data=barGraphStats(data=subset(fitnessData, diversity==1), variable="healthy_beans", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
   geom_bar(stat='identity', position=position_dodge(width=0.25), color='black', fill='white') +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
     xlab('Rhizobial Strain') + ylab('Healthy Bean Number') +
@@ -772,23 +505,36 @@ ggplot(data=barGraphStats(data=subset(fitnessData, healthy_beans<9000&diversity=
   annotate('text', x=4, y=270,label='b', size=8)
 #export at 800x600
 
+# fitnessData$strains_code <- factor(fitnessData$strains_code, levels=c('A', 'B', 'C', 'D', 'AB', 'AC', 'AD', 'BC', 'BD', 'CD', 'ABC', 'ABD', 'BCD'))
+# 
+# ggplot(data=barGraphStats(data=subset(fitnessData, diversity!=0), variable="healthy_beans", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
+#   geom_bar(stat='identity', position=position_dodge(width=0.25), color='black', fill='white') +
+#   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
+#   xlab('Rhizobial Strain') + ylab('Healthy Bean Number') +
+#   theme(axis.title.y=element_text(vjust=1))
+# #export at 800x600
+
+
 #total beans
 summary(beansMonocultureModel <- lme(total_beans~strains_code*warming, random=~1|bed,
-                                     data=subset(fitnessData, total_pods<9000&diversity!=0))) 
+                                     data=subset(fitnessData, diversity==1))) 
+check_model(beansMonocultureModel)
 anova.lme(beansMonocultureModel) #strain
 lsmeans(beansMonocultureModel, pairwise~as.factor(strains_code), adjust="tukey")
 
-ggplot(data=barGraphStats(data=subset(fitnessData, healthy_beans<9000&diversity!=0), variable="healthy_beans", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
-  geom_bar(stat='identity', position=position_dodge(width=0.25), color='black', fill='white') +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
-  xlab('Rhizobial Strain') + ylab('Healthy Bean Number') +
-  theme(axis.title.y=element_text(vjust=1)) +
-  annotate('text', x=1, y=380,label='a', size=8) +
-  annotate('text', x=2, y=320,label='ab', size=8) +
-  annotate('text', x=3, y=335,label='ab', size=8) +
-  annotate('text', x=4, y=270,label='b', size=8)
-#export at 800x600
+#bean weight
+summary(beansMonocultureModel <- lme(bean_weight_g~strains_code*warming, random=~1|bed,
+                                     data=subset(fitnessData, diversity==1))) 
+check_model(beansMonocultureModel)
+anova.lme(beansMonocultureModel) #strain
+lsmeans(beansMonocultureModel, pairwise~as.factor(strains_code), adjust="tukey")
 
+# ggplot(data=barGraphStats(data=subset(fitnessData, diversity==1), variable="bean_weight_g", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
+#   geom_bar(stat='identity', position=position_dodge(width=0.25), color='black', fill='white') +
+#   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.25), width=0.2) +
+#   xlab('Rhizobial Strain') + ylab('Bean Weight (g)') +
+#   theme(axis.title.y=element_text(vjust=1))
+# #export at 800x600
 
 
 
