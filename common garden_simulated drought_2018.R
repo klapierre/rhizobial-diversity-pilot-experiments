@@ -285,7 +285,8 @@ rabbitFig <- ggplot(data=barGraphStats(data=subset(rabbitData, date=='7/19/2018'
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(0.9), width=0.2) +
   scale_x_discrete(breaks=c(1,2,3), labels=c("1 strain", "2 strains", "3 strains")) +
   xlab('Rhizobial Diversity') + ylab('Rabbit Damage (%)') +
-  annotate('text', x=0.5, y=45, label='(c)', size=8)
+  annotate('text', x=0.5, y=45, label='(c)', size=8) +
+  theme(legend.position='none')
 #export at 800 x 800
 
 #herbivory figure
