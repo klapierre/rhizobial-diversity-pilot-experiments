@@ -18,7 +18,7 @@ library(ggpubr)
 setwd('C:\\Users\\lapie\\Dropbox (Smithsonian)\\SERC\\interns\\2018\\2018_REU_Esch\\final data_komatsu approved')
 
 #desktop
-setwd('C:\\Users\\la pierrek\\Dropbox (Smithsonian)\\SERC\\interns\\2018\\2018_REU_Esch\\final data_komatsu approved')
+setwd('C:\\Users\\komatsuk\\Dropbox (Smithsonian)\\SERC\\interns\\2018\\2018_REU_Esch\\final data_komatsu approved')
 
 theme_set(theme_bw())
 theme_update(axis.title.x=element_text(size=20, vjust=-0.35), axis.text.x=element_text(size=20),
@@ -206,15 +206,20 @@ back.emmeans(emmeans(insectherbModel, pairwise~as.factor(diversity), adjust="tuk
 
 
 #insect damage figure - diversity
-insectFig <- ggplot(data=barGraphStats(data=subset(herbivoryData, doy!=200 & diversity!=0), variable="avg_perc_herbivory", byFactorNames=c("diversity")), aes(x=as.factor(diversity), y=mean)) +
-  geom_bar(stat='identity', position=position_dodge(), fill='white', color='black') +
+insectFig <- ggplot(data=barGraphStats(data=subset(herbivoryData, doy!=200 & diversity!=0), variable="avg_perc_herbivory", byFactorNames=c("diversity")), aes(x=as.factor(diversity), y=mean, fill=as.factor(diversity))) +
+  geom_bar(stat='identity', position=position_dodge(), color='black') +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  scale_fill_manual(values=c('#f37735', '#00b159', '#00aedb'),
+                     breaks=c(1,2,3),
+                     labels=c('1 strain', '2 strains', '3 strains'),
+                     name='Rhizobial\nDiversity') +
   theme(axis.title.x=element_blank(), axis.text.x=element_blank()) +
   xlab('') + ylab('Insect Damage (%)') +
   annotate('text', x=1, y=3, label='a', size=8) +
   annotate('text', x=2, y=2.7, label='ab', size=8) +
   annotate('text', x=3, y=2.4, label='b', size=8) +
-  annotate('text', x=0.5, y=3, label='(b)', size=8)
+  annotate('text', x=0.5, y=3, label='(b)', size=8) +
+  theme(legend.position = 'none')
 #export at 800 x 800
 
 ###aphid number---------
@@ -227,13 +232,13 @@ summary(glm(Aphids~diversity, data=subset(insectData, warming==0))) #no effect
 summary(glm(Aphids~diversity, data=subset(insectData, warming==1))) #diversity effect
 
 
-aphidFig <- ggplot(data=barGraphStats(data=subset(insectData, diversity!=0), variable="Aphids", byFactorNames=c("warming", "diversity")), aes(x=as.factor(diversity), y=mean, fill=as.factor(warming))) +
-  geom_bar(stat='identity', position=position_dodge()) +
+aphidFig <- ggplot(data=barGraphStats(data=subset(insectData, diversity!=0), variable="Aphids", byFactorNames=c("warming", "diversity")), aes(x=as.factor(diversity), y=mean, fill=interaction(as.factor(warming),as.factor(diversity)))) +
+  geom_bar(stat='identity', position=position_dodge(), color='black') +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.9), width=0.2) +
-  scale_fill_manual(values=c('#666666', '#cc0000'),
-                    breaks=c(0,1),
-                    labels=c('control', 'drought'),
-                    name='Drought\nTreatment') +
+  scale_fill_manual(values=c('#f37735', '#f37735', '#00b159','#00b159', '#00aedb', '#00aedb'),
+                    # breaks=c(0,1),
+                    # labels=c('control', 'drought'),
+                    name='Diversity\nTreatment') +
   xlab('') + ylab('Aphid Number') +
   theme(axis.title.y=element_text(vjust=1), legend.position=c(0.98,0.98), legend.justification=c(1,1), 
         axis.title.x=element_blank(), axis.text.x=element_blank()) +
@@ -270,8 +275,13 @@ anova.lme(rabbitModel, type='sequential')  #no effect
 summary(lme(percent_rabbit_herb~diversity, data=subset(rabbitData, warming==0), random=~1|bed)) #no effect 
 summary(lme(percent_rabbit_herb~diversity, data=subset(rabbitData, warming==1), random=~1|bed)) #no effect
 
-rabbitFig <- ggplot(data=barGraphStats(data=subset(rabbitData, date=='7/19/2018'&diversity!=0), variable="percent_rabbit_herb", byFactorNames=c("diversity")), aes(x=as.factor(diversity), y=mean)) +
-  geom_bar(stat='identity', position=position_dodge(), fill='white', color='black') +
+rabbitFig <- ggplot(data=barGraphStats(data=subset(rabbitData, date=='7/19/2018'&diversity!=0), variable="percent_rabbit_herb", byFactorNames=c("diversity")), aes(x=as.factor(diversity), y=mean, fill=as.factor(diversity))) +
+  geom_bar(stat='identity', position=position_dodge(), color='black') +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.2, position=position_dodge(0.9)) +
+  scale_fill_manual(values=c('#f37735', '#00b159', '#00aedb'),
+                    breaks=c(1,2,3),
+                    labels=c('1 strain', '2 strains', '3 strains'),
+                    name='Rhizobial\nDiversity') +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(0.9), width=0.2) +
   scale_x_discrete(breaks=c(1,2,3), labels=c("1 strain", "2 strains", "3 strains")) +
   xlab('Rhizobial Diversity') + ylab('Rabbit Damage (%)') +
@@ -319,7 +329,9 @@ anova.lme(weightModel, type='sequential') #no effect
 
 
 
-###regressions between damage and fitness outcomes
+
+
+###regressions between damage and fitness outcomes-----
 #subset and merge data
 
 #plot by doe to determine what date to select for regressions (data support averaging across all dates)
@@ -335,7 +347,7 @@ herbivoryRegData <- herbivoryData%>%
   ungroup()
 insectRegData <- insectData%>%select(bed, plant, warming, diversity, Aphids, height_cm, num_leaflets)
 rabbitRegData <- rabbitData%>%select(bed, plant, warming, diversity, percent_rabbit_herb)
-fitnessRegData <- fitnessData%>%select(bed, plant, warming, diversity, total_pods, aborted_pods, viable_pods, total_beans, healthy_beans, bean_weight_g)
+fitnessRegData <- fitnessData%>%select(bed, plant, warming, diversity, total_pods, aborted_pods, viable_pods, total_beans, damaged_beans, aborted_beans, healthy_beans, bean_weight_g)
 regData <- herbivoryRegData%>%left_join(rabbitRegData)%>%left_join(fitnessRegData)%>%left_join(insectRegData)%>%filter(complete.cases(.))%>%filter(diversity!=0)
 
 #are insect and rabbit herbivory correlated?
@@ -344,58 +356,81 @@ summary(lme(percent_rabbit_herb ~ Aphids, data=regData, random=~1|bed)) #no corr
 summary(lm(sqrt(avg_insect_herb) ~ Aphids, data=regData)) #negative correlation
 
 
-###residuals to account for plant size
+
+# ###without residuals-----
+# #healthy bean number
+# summary(healthyBeansInsectModel <- lme(healthy_beans ~ sqrt(avg_insect_herb)*as.factor(diversity), data=subset(regData, diversity!=0), random=~1|bed)) 
+# check_model(healthyBeansInsectModel)
+# anova.lme(healthyBeansInsectModel, type='sequential') #insect effect but no interaction
+# 
+# summary(healthyBeansAphidsModel <- lme(healthy_beans ~ Aphids*as.factor(diversity), data=subset(regData, diversity!=0), random=~1|bed)) 
+# check_model(healthyBeansAphidsModel)
+# anova.lme(healthyBeansAphidsModel, type='sequential') #aphid effect but no interaction
+# 
+# summary(healthyBeansRabbitModel <- lme(healthy_beans ~ percent_rabbit_herb*as.factor(diversity), data=subset(regData, diversity!=0), random=~1|bed)) 
+# check_model(healthyBeansRabbitModel)
+# anova.lme(healthyBeansRabbitModel, type='sequential') #rabbit effect but no interaction
+
+
+###residuals to account for plant size-----
+#healthy beans
 healthyBeansResiduals <- as.data.frame(residuals(lm(healthy_beans~num_leaflets, data=regData)))%>%
   cbind(regData)
 colnames(healthyBeansResiduals)[1] <-'residuals'
 
 #healthy bean number
-summary(lm(residuals ~ sqrt(avg_insect_herb), data=healthyBeansResiduals))
-summary(lm(residuals ~ Aphids, data=healthyBeansResiduals)) #significant increase
-summary(lm(residuals ~ percent_rabbit_herb, data=healthyBeansResiduals))
+summary(healthyBeansInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity), data=subset(healthyBeansResiduals, diversity!=0), random=~1|bed)) 
+check_model(healthyBeansInsectModel)
+anova.lme(healthyBeansInsectModel, type='sequential') #no effect
 
+summary(healthyBeansAphidsModel <- lme(residuals ~ Aphids*as.factor(diversity), data=subset(healthyBeansResiduals, diversity!=0), random=~1|bed)) 
+check_model(healthyBeansAphidsModel)
+anova.lme(healthyBeansAphidsModel, type='sequential') #marginally significant interaction
 
+summary(healthyBeansRabbitModel <- lme(residuals ~ percent_rabbit_herb*as.factor(diversity), data=subset(healthyBeansResiduals, diversity!=0), random=~1|bed)) 
+check_model(healthyBeansRabbitModel)
+anova.lme(healthyBeansRabbitModel, type='sequential') #no effect
+
+# 
 #figure
-aphidBeansFig <- ggplot(data=regData, aes(x=Aphids, y=healthy_beans)) +
-  geom_point(size=3, aes(shape=as.factor(diversity), color=as.factor(warming))) +
+aphidBeansFig <- ggplot(data=subset(regData, diversity!=0), aes(x=Aphids, y=healthy_beans, color=as.factor(diversity))) +
+  geom_point(size=3, aes(color=as.factor(diversity))) +
   xlab('Aphid Number') + ylab('Healthy Bean Number') +
-  scale_color_manual(values=c('#666666', '#cc0000'),
-                    breaks=c(0,1),
-                    labels=c('control', 'drought'),
-                    name='Drought\nTreatment') +
-  scale_shape_manual(values=c(19,17,15),
+  geom_smooth(method='lm', se=F) +
+  scale_color_manual(values=c('#f37735', '#00b159', '#00aedb'),
                      breaks=c(1,2,3),
                      labels=c('1 strain', '2 strains', '3 strains'),
-                     name='Diversity\nTreatment') +
-  stat_smooth(method='lm', color='black', se=F) +
-  scale_x_continuous(trans='log10')
-
-insectBeansFig <- ggplot(data=regData, aes(x=avg_insect_herb, y=healthy_beans)) +
-  geom_point(size=3, aes(shape=as.factor(diversity), color=as.factor(warming))) +
+                     name='Rhizobial\nDiversity')
+# scale_shape_manual(values=c(19,17),
+#                    breaks=c(0,1),
+#                    labels=c('Control', 'Drought'),
+#                    name='Drought\nTreatment')
+insectBeansFig <- ggplot(data=subset(regData, diversity!=0), aes(x=avg_insect_herb, y=healthy_beans, color=as.factor(diversity))) +
+  geom_point(size=3, aes(color=as.factor(diversity))) +
   xlab('Insect Damage (%)') + ylab('Healthy Bean Number') +
-  scale_color_manual(values=c('#666666', '#cc0000'),
-                     breaks=c(0,1),
-                     labels=c('control', 'drought'),
-                     name='Drought\nTreatment') +
-  scale_shape_manual(values=c(19,17,15),
+  # geom_smooth(method='lm', se=F) +
+  scale_color_manual(values=c('#f37735', '#00b159', '#00aedb'),
                      breaks=c(1,2,3),
                      labels=c('1 strain', '2 strains', '3 strains'),
-                     name='Diversity\nTreatment') +
-  # stat_smooth(method='lm', color='black', se=F) +
+                     name='Rhizobial\nDiversity') +
+  # scale_shape_manual(values=c(19,17),
+  #                    breaks=c(0,1),
+  #                    labels=c('Control', 'Drought'),
+  #                    name='Drought\nTreatment')
   scale_x_continuous(trans='sqrt')
-
-rabbitBeansFig <- ggplot(data=regData, aes(x=percent_rabbit_herb, y=healthy_beans)) +
-  geom_point(size=3, aes(shape=as.factor(diversity), color=as.factor(warming))) +
+rabbitBeansFig <- ggplot(data=subset(regData, diversity!=0), aes(x=percent_rabbit_herb, y=healthy_beans, color=as.factor(diversity))) +
+  geom_point(size=3, aes(color=as.factor(diversity))) +
+  # geom_smooth(method='lm', se=F) +
   xlab('Rabbit Damage (%)') + ylab('Healthy Bean Number') +
-  scale_color_manual(values=c('#666666', '#cc0000'),
-                     breaks=c(0,1),
-                     labels=c('control', 'drought'),
-                     name='Drought\nTreatment') +
-  scale_shape_manual(values=c(19,17,15),
+  scale_color_manual(values=c('#f37735', '#00b159', '#00aedb'),
                      breaks=c(1,2,3),
                      labels=c('1 strain', '2 strains', '3 strains'),
-                     name='Diversity\nTreatment')
-  # stat_smooth(method='lm', color='black', se=F)
+                     name='Rhizobial\nDiversity')
+# scale_shape_manual(values=c(19,17),
+#                    breaks=c(0,1),
+#                    labels=c('Control', 'Drought'),
+#                    name='Drought\nTreatment')
+# stat_smooth(method='lm', color='black', se=F)
 
 #aphid number, insect, and rabbit damage on healthy beans
 ggarrange(aphidBeansFig, insectBeansFig, rabbitBeansFig,
@@ -404,6 +439,95 @@ ggarrange(aphidBeansFig, insectBeansFig, rabbitBeansFig,
 #export at 1800x600
 
 
+
+#aborted beans
+abortedBeansResiduals <- as.data.frame(residuals(lm(aborted_beans~num_leaflets, data=regData)))%>%
+  cbind(regData)
+colnames(abortedBeansResiduals)[1] <-'residuals'
+
+summary(abortedBeansInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity), data=subset(abortedBeansResiduals, diversity!=0), random=~1|bed)) 
+check_model(abortedBeansInsectModel)
+anova.lme(abortedBeansInsectModel, type='sequential') #no effect
+
+summary(abortedBeansAphidsModel <- lme(residuals ~ Aphids*as.factor(diversity), data=subset(abortedBeansResiduals, diversity!=0), random=~1|bed)) 
+check_model(abortedBeansAphidsModel)
+anova.lme(abortedBeansAphidsModel, type='sequential') #no effect
+
+summary(abortedBeansRabbitModel <- lme(residuals ~ percent_rabbit_herb*as.factor(diversity), data=subset(abortedBeansResiduals, diversity!=0), random=~1|bed)) 
+check_model(abortedBeansRabbitModel)
+anova.lme(abortedBeansRabbitModel, type='sequential') #no effect
+
+
+#damaged beans
+damagedBeansResiduals <- as.data.frame(residuals(lm(damaged_beans~num_leaflets, data=regData)))%>%
+  cbind(regData)
+colnames(damagedBeansResiduals)[1] <-'residuals'
+
+summary(damagedBeansInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity), data=subset(damagedBeansResiduals, diversity!=0), random=~1|bed)) 
+check_model(damagedBeansInsectModel)
+anova.lme(damagedBeansInsectModel, type='sequential') #no effect
+
+summary(damagedBeansAphidsModel <- lme(residuals ~ Aphids*as.factor(diversity), data=subset(damagedBeansResiduals, diversity!=0), random=~1|bed)) 
+check_model(damagedBeansAphidsModel)
+anova.lme(damagedBeansAphidsModel, type='sequential') #no effect
+
+summary(damagedBeansRabbitModel <- lme(residuals ~ percent_rabbit_herb*as.factor(diversity), data=subset(damagedBeansResiduals, diversity!=0), random=~1|bed)) 
+check_model(damagedBeansRabbitModel)
+anova.lme(damagedBeansRabbitModel, type='sequential') #no effect
+
+
+#viable pods
+viablePodsResiduals <- as.data.frame(residuals(lm(viable_pods~num_leaflets, data=regData)))%>%
+  cbind(regData)
+colnames(viablePodsResiduals)[1] <-'residuals'
+
+summary(viablePodsInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity), data=subset(viablePodsResiduals, diversity!=0), random=~1|bed)) 
+check_model(viablePodsInsectModel)
+anova.lme(viablePodsInsectModel, type='sequential') #no effect
+
+summary(viablePodsAphidsModel <- lme(residuals ~ Aphids*as.factor(diversity), data=subset(viablePodsResiduals, diversity!=0), random=~1|bed)) 
+check_model(viablePodsAphidsModel)
+anova.lme(viablePodsAphidsModel, type='sequential') #no effect
+
+summary(viablePodsRabbitModel <- lme(residuals ~ percent_rabbit_herb*as.factor(diversity), data=subset(viablePodsResiduals, diversity!=0), random=~1|bed)) 
+check_model(viablePodsRabbitModel)
+anova.lme(viablePodsRabbitModel, type='sequential') #no effect
+
+
+#aborted pods
+abortedPodsResiduals <- as.data.frame(residuals(lm(aborted_pods~num_leaflets, data=regData)))%>%
+  cbind(regData)
+colnames(abortedPodsResiduals)[1] <-'residuals'
+
+summary(abortedPodsInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity), data=subset(abortedPodsResiduals, diversity!=0), random=~1|bed)) 
+check_model(abortedPodsInsectModel)
+anova.lme(abortedPodsInsectModel, type='sequential') #marginally significant diversity effect
+
+summary(abortedPodsAphidsModel <- lme(residuals ~ Aphids*as.factor(diversity), data=subset(abortedPodsResiduals, diversity!=0), random=~1|bed)) 
+check_model(abortedPodsAphidsModel)
+anova.lme(abortedPodsAphidsModel, type='sequential') #marginally significant diversity effect
+
+summary(abortedPodsRabbitModel <- lme(residuals ~ percent_rabbit_herb*as.factor(diversity), data=subset(abortedPodsResiduals, diversity!=0), random=~1|bed)) 
+check_model(abortedPodsRabbitModel)
+anova.lme(abortedPodsRabbitModel, type='sequential') #marginally significant diversity effect
+
+
+#bean weight
+weightResiduals <- as.data.frame(residuals(lm(bean_weight_g~num_leaflets, data=regData)))%>%
+  cbind(regData)
+colnames(weightResiduals)[1] <-'residuals'
+
+summary(weightInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity), data=subset(weightResiduals, diversity!=0), random=~1|bed)) 
+check_model(weightInsectModel)
+anova.lme(weightInsectModel, type='sequential') #no effect
+
+summary(weightAphidsModel <- lme(residuals ~ Aphids*as.factor(diversity), data=subset(weightResiduals, diversity!=0), random=~1|bed)) 
+check_model(weightAphidsModel)
+anova.lme(weightAphidsModel, type='sequential') #no effect
+
+summary(weightRabbitModel <- lme(residuals ~ percent_rabbit_herb*as.factor(diversity), data=subset(weightResiduals, diversity!=0), random=~1|bed)) 
+check_model(weightRabbitModel)
+anova.lme(weightRabbitModel, type='sequential') #no effect
 
 
 
