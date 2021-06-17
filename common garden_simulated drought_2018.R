@@ -380,17 +380,10 @@ healthyBeansResiduals <- as.data.frame(residuals(lm(healthy_beans~num_leaflets, 
 colnames(healthyBeansResiduals)[1] <-'residuals'
 
 #healthy bean number
-summary(healthyBeansInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity), data=subset(healthyBeansResiduals, diversity!=0), random=~1|bed)) 
+summary(healthyBeansInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity) + Aphids*as.factor(diversity) + percent_rabbit_herb*as.factor(diversity), data=subset(healthyBeansResiduals, diversity!=0), random=~1|bed)) 
 check_model(healthyBeansInsectModel)
 anova.lme(healthyBeansInsectModel, type='sequential') #no effect
 
-summary(healthyBeansAphidsModel <- lme(residuals ~ Aphids*as.factor(diversity), data=subset(healthyBeansResiduals, diversity!=0), random=~1|bed)) 
-check_model(healthyBeansAphidsModel)
-anova.lme(healthyBeansAphidsModel, type='sequential') #marginally significant interaction
-
-summary(healthyBeansRabbitModel <- lme(residuals ~ percent_rabbit_herb*as.factor(diversity), data=subset(healthyBeansResiduals, diversity!=0), random=~1|bed)) 
-check_model(healthyBeansRabbitModel)
-anova.lme(healthyBeansRabbitModel, type='sequential') #no effect
 
 # 
 #figure
@@ -446,17 +439,9 @@ abortedBeansResiduals <- as.data.frame(residuals(lm(aborted_beans~num_leaflets, 
   cbind(regData)
 colnames(abortedBeansResiduals)[1] <-'residuals'
 
-summary(abortedBeansInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity), data=subset(abortedBeansResiduals, diversity!=0), random=~1|bed)) 
+summary(abortedBeansInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity) + Aphids*as.factor(diversity) + percent_rabbit_herb*as.factor(diversity), data=subset(abortedBeansResiduals, diversity!=0), random=~1|bed)) 
 check_model(abortedBeansInsectModel)
 anova.lme(abortedBeansInsectModel, type='sequential') #no effect
-
-summary(abortedBeansAphidsModel <- lme(residuals ~ Aphids*as.factor(diversity), data=subset(abortedBeansResiduals, diversity!=0), random=~1|bed)) 
-check_model(abortedBeansAphidsModel)
-anova.lme(abortedBeansAphidsModel, type='sequential') #no effect
-
-summary(abortedBeansRabbitModel <- lme(residuals ~ percent_rabbit_herb*as.factor(diversity), data=subset(abortedBeansResiduals, diversity!=0), random=~1|bed)) 
-check_model(abortedBeansRabbitModel)
-anova.lme(abortedBeansRabbitModel, type='sequential') #no effect
 
 
 #damaged beans
@@ -464,17 +449,9 @@ damagedBeansResiduals <- as.data.frame(residuals(lm(damaged_beans~num_leaflets, 
   cbind(regData)
 colnames(damagedBeansResiduals)[1] <-'residuals'
 
-summary(damagedBeansInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity), data=subset(damagedBeansResiduals, diversity!=0), random=~1|bed)) 
+summary(damagedBeansInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity) + Aphids*as.factor(diversity) + percent_rabbit_herb*as.factor(diversity), data=subset(damagedBeansResiduals, diversity!=0), random=~1|bed)) 
 check_model(damagedBeansInsectModel)
 anova.lme(damagedBeansInsectModel, type='sequential') #no effect
-
-summary(damagedBeansAphidsModel <- lme(residuals ~ Aphids*as.factor(diversity), data=subset(damagedBeansResiduals, diversity!=0), random=~1|bed)) 
-check_model(damagedBeansAphidsModel)
-anova.lme(damagedBeansAphidsModel, type='sequential') #no effect
-
-summary(damagedBeansRabbitModel <- lme(residuals ~ percent_rabbit_herb*as.factor(diversity), data=subset(damagedBeansResiduals, diversity!=0), random=~1|bed)) 
-check_model(damagedBeansRabbitModel)
-anova.lme(damagedBeansRabbitModel, type='sequential') #no effect
 
 
 #viable pods
@@ -482,17 +459,9 @@ viablePodsResiduals <- as.data.frame(residuals(lm(viable_pods~num_leaflets, data
   cbind(regData)
 colnames(viablePodsResiduals)[1] <-'residuals'
 
-summary(viablePodsInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity), data=subset(viablePodsResiduals, diversity!=0), random=~1|bed)) 
+summary(viablePodsInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity) + Aphids*as.factor(diversity) + percent_rabbit_herb*as.factor(diversity), data=subset(viablePodsResiduals, diversity!=0), random=~1|bed)) 
 check_model(viablePodsInsectModel)
 anova.lme(viablePodsInsectModel, type='sequential') #no effect
-
-summary(viablePodsAphidsModel <- lme(residuals ~ Aphids*as.factor(diversity), data=subset(viablePodsResiduals, diversity!=0), random=~1|bed)) 
-check_model(viablePodsAphidsModel)
-anova.lme(viablePodsAphidsModel, type='sequential') #no effect
-
-summary(viablePodsRabbitModel <- lme(residuals ~ percent_rabbit_herb*as.factor(diversity), data=subset(viablePodsResiduals, diversity!=0), random=~1|bed)) 
-check_model(viablePodsRabbitModel)
-anova.lme(viablePodsRabbitModel, type='sequential') #no effect
 
 
 #aborted pods
@@ -500,17 +469,9 @@ abortedPodsResiduals <- as.data.frame(residuals(lm(aborted_pods~num_leaflets, da
   cbind(regData)
 colnames(abortedPodsResiduals)[1] <-'residuals'
 
-summary(abortedPodsInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity), data=subset(abortedPodsResiduals, diversity!=0), random=~1|bed)) 
+summary(abortedPodsInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity) + Aphids*as.factor(diversity) + percent_rabbit_herb*as.factor(diversity), data=subset(abortedPodsResiduals, diversity!=0), random=~1|bed)) 
 check_model(abortedPodsInsectModel)
 anova.lme(abortedPodsInsectModel, type='sequential') #marginally significant diversity effect
-
-summary(abortedPodsAphidsModel <- lme(residuals ~ Aphids*as.factor(diversity), data=subset(abortedPodsResiduals, diversity!=0), random=~1|bed)) 
-check_model(abortedPodsAphidsModel)
-anova.lme(abortedPodsAphidsModel, type='sequential') #marginally significant diversity effect
-
-summary(abortedPodsRabbitModel <- lme(residuals ~ percent_rabbit_herb*as.factor(diversity), data=subset(abortedPodsResiduals, diversity!=0), random=~1|bed)) 
-check_model(abortedPodsRabbitModel)
-anova.lme(abortedPodsRabbitModel, type='sequential') #marginally significant diversity effect
 
 
 #bean weight
@@ -518,17 +479,9 @@ weightResiduals <- as.data.frame(residuals(lm(bean_weight_g~num_leaflets, data=r
   cbind(regData)
 colnames(weightResiduals)[1] <-'residuals'
 
-summary(weightInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity), data=subset(weightResiduals, diversity!=0), random=~1|bed)) 
+summary(weightInsectModel <- lme(residuals ~ sqrt(avg_insect_herb)*as.factor(diversity) + Aphids*as.factor(diversity) + percent_rabbit_herb*as.factor(diversity), data=subset(weightResiduals, diversity!=0), random=~1|bed)) 
 check_model(weightInsectModel)
 anova.lme(weightInsectModel, type='sequential') #no effect
-
-summary(weightAphidsModel <- lme(residuals ~ Aphids*as.factor(diversity), data=subset(weightResiduals, diversity!=0), random=~1|bed)) 
-check_model(weightAphidsModel)
-anova.lme(weightAphidsModel, type='sequential') #no effect
-
-summary(weightRabbitModel <- lme(residuals ~ percent_rabbit_herb*as.factor(diversity), data=subset(weightResiduals, diversity!=0), random=~1|bed)) 
-check_model(weightRabbitModel)
-anova.lme(weightRabbitModel, type='sequential') #no effect
 
 
 
