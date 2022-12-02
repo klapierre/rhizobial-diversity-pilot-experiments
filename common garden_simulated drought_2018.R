@@ -14,11 +14,9 @@ library(performance)
 library(tidyverse)
 library(ggpubr)
 
-#laptop
-setwd('C:\\Users\\lapie\\Dropbox (Smithsonian)\\SERC\\interns\\2018\\2018_REU_Esch\\final data_komatsu approved')
+#kim's working directory
+setwd('C:\\Users\\kjkomatsu\\OneDrive - UNCG\\SERC\\interns\\2018\\2018_REU_Esch\\final data_komatsu approved')
 
-#desktop
-setwd('C:\\Users\\komatsuk\\Dropbox (Smithsonian)\\SERC\\interns\\2018\\2018_REU_Esch\\final data_komatsu approved')
 
 theme_set(theme_bw())
 theme_update(axis.title.x=element_text(size=20, vjust=-0.35), axis.text.x=element_text(size=20),
@@ -240,8 +238,8 @@ aphidFig <- ggplot(data=barGraphStats(data=subset(insectData, diversity!=0), var
                     # breaks=c(0,1),
                     # labels=c('control', 'drought'),
                     name='Diversity\nTreatment') +
-  xlab('') + ylab('Aphid Number') +
-  theme(axis.title.y=element_text(vjust=1), legend.position=c(0.98,0.98), legend.justification=c(1,1), 
+  xlab('') + ylab('Aphids per Plant') +
+  theme(axis.title.y=element_text(vjust=1), 
         axis.title.x=element_blank(), axis.text.x=element_blank()) +
   annotate('text', x=0.76, y=220,label='a', size=8) +
   annotate('text', x=1.24, y=1000,label='b', size=8) +
@@ -249,7 +247,8 @@ aphidFig <- ggplot(data=barGraphStats(data=subset(insectData, diversity!=0), var
   annotate('text', x=2.24, y=580,label='ab', size=8) +
   annotate('text', x=2.76, y=180,label='a', size=8) +
   annotate('text', x=3.24, y=450,label='a', size=8) +
-  annotate('text', x=0.5, y=1000, label='(a)', size=8)
+  annotate('text', x=0.5, y=1000, label='(a)', size=8) +
+  theme(legend.position='none')
 #export at 800x800
 
 
@@ -463,7 +462,7 @@ aphidBeansDroughtFig <- ggplot(data=subset(regData, diversity!=0&warming==1), ae
   xlim(0,2800) + ylim(0,600)
 aphidBeansAmbientFig <- ggplot(data=subset(regData, diversity!=0&warming==0), aes(x=Aphids, y=healthy_beans, color=as.factor(diversity))) +
   geom_point(size=3, aes(color=as.factor(diversity))) +
-  xlab('Aphid Number') + ylab('Healthy Bean Number') +
+  xlab('Aphids per Plant') + ylab('Healthy Bean Number') +
   scale_color_manual(values=c('#f37735', '#00b159', '#00aedb'),
                      breaks=c(1,2,3),
                      labels=c('1 strain', '2 strains', '3 strains'),
@@ -680,7 +679,7 @@ anova.lme(aphidsMonocultureModel, type='sequential') #warming
 aphidMonoculturePlot <- ggplot(data=barGraphStats(data=subset(insectData, Aphids<9000&diversity==1), variable="Aphids", byFactorNames=c("strains_code")), aes(x=as.factor(strains_code), y=mean)) +
   geom_bar(stat='identity', position=position_dodge(), fill='light grey', color='black') +
   geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(width=0.9), width=0.2) +
-  xlab('Rhizobial Strain') + ylab('Aphid Number') +
+  xlab('Rhizobial Strain') + ylab('Aphids per Plant') +
   theme(axis.title.y=element_text(vjust=1), axis.title.x=element_blank(), axis.text.x=element_blank()) +
   annotate('text', x=0.6, y=1000, label='(a)', size=8)
 #export at 800x800
@@ -702,7 +701,7 @@ insectMonoculturePlot <- ggplot(data=barGraphStats(data=subset(herbivoryData, do
   # scale_color_manual(values=c('#0072B2', '#D55E00'),
   #                    breaks=c(0,1),
   #                    labels=c('Control', 'Drought')) +
-  xlab('Rhizobial Strain') + ylab('Invertebrate Herbivory (%)') +
+  xlab('Rhizobial Strain') + ylab('Insect Damage (%)') +
   annotate('text', x=0.6, y=4.5, label='(b)', size=8)
 #export at 800 x 800
 
@@ -729,7 +728,7 @@ rabbitMonoculturePlot <- ggplot(data=barGraphStats(data=subset(rabbitData, date=
   # scale_color_manual(values=c('#0072B2', '#D55E00'),
   #                    breaks=c(0,1),
   #                    labels=c('Control', 'Drought')) +
-  xlab('Rhizobial Strain') + ylab('Rabbit Herbivory (%)') +
+  xlab('Rhizobial Strain') + ylab('Rabbit Damage (%)') +
   annotate('text', x=0.6, y=55, label='(c)', size=8)
 #export at 800 x 800
 
